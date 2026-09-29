@@ -58,17 +58,17 @@ export function Hero() {
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/register/driver"
+              href="/login"
               className="w-full sm:w-auto px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-colors text-center"
             >
-              {t.hero.ctaPrimary}
+              {t.hero.ctaLogin}
             </Link>
-            <a
-              href="#features"
+            <Link
+              href="/register/driver"
               className="w-full sm:w-auto px-8 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-medium rounded-lg transition-colors text-center"
             >
-              {t.hero.ctaSecondary}
-            </a>
+              {t.hero.ctaRegister}
+            </Link>
           </div>
         </div>
       </div>

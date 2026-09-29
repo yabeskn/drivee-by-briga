@@ -8,7 +8,8 @@ export const id = {
   hero: {
     title: 'Telematika Armada EV Cerdas',
     subtitle: 'Catat perjalanan, skor eco-driving, dan dapatkan reward BrigaCoins — semua dari smartphone.',
-    ctaPrimary: 'Daftar/Login',
+    ctaLogin: 'Login',
+    ctaRegister: 'Daftar',
     ctaSecondary: 'Lihat Fitur',
   },
   features: {

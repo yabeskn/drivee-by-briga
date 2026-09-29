@@ -10,7 +10,8 @@ export const en: Translations = {
   hero: {
     title: 'Drive, Earn, and Track safely',
     subtitle: 'Track trips, eco-driving score, and earn BrigaCoins rewards — all from your smartphone.',
-    ctaPrimary: 'Register/Login',
+    ctaLogin: 'Login',
+    ctaRegister: 'Register',
     ctaSecondary: 'View Features',
   },
   features: {
