@@ -40,7 +40,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const verifyLink = `${baseUrl}/verify?token=${token.token}`;
 
     // Send WhatsApp message
-    const message = `Verifikasi nomor HP Anda di Drivee by Briga.\n\nKlik link berikut untuk verifikasi:\n${verifyLink}\n\nLink berlaku 5 menit.`;
+    const message = `Verifikasi nomor HP Anda di Drifee by Briga.\n\nKlik link berikut untuk verifikasi:\n${verifyLink}\n\nLink berlaku 5 menit.`;
     const waResult = await agentManager.sendMessage(phone, message);
 
     if (!waResult.success) {

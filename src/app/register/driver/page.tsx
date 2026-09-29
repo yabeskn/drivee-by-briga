@@ -95,7 +95,7 @@ export default function DriverRegistrationPage() {
                 <path d="M380 380 Q400 360 380 340 Q360 360 380 380" fill="#10b981"/>
               </svg>
             </div>
-            <span className="text-lg font-semibold text-white">Drivee</span>
+            <span className="text-lg font-semibold text-white">Drifee</span>
           </Link>
           <LanguageSwitcher />
         </div>

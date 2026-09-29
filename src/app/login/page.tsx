@@ -69,7 +69,7 @@ function LoginContent() {
                 <path d="M380 380 Q400 360 380 340 Q360 360 380 380" fill="#10b981"/>
               </svg>
             </div>
-            <span className="text-lg font-semibold text-white">Drivee</span>
+            <span className="text-lg font-semibold text-white">Drifee</span>
           </div>
           <LanguageSwitcher />
         </div>
@@ -77,7 +77,7 @@ function LoginContent() {
         <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-white mb-2">Sign in with Google</h2>
           <p className="text-sm text-zinc-400 mb-4">
-            Use your Google account to sign in to Drivee.
+            Use your Google account to sign in to Drifee.
           </p>
           <GoogleSignInButton />
         </div>
