@@ -35,7 +35,7 @@ export const id = {
     title: 'Cara Kerja',
     subtitle: 'Mulai dalam 4 langkah mudah',
     step1: { title: 'Daftar', desc: 'Isi formulir pendaftaran driver dan kendaraan.' },
-    step2: { title: 'Install PWA', desc: 'Tambahkan Drivee ke home screen smartphone.' },
+    step2: { title: 'Install PWA', desc: 'Tambahkan Drifee ke home screen smartphone.' },
     step3: { title: 'Mulai Trip', desc: 'Buka aplikasi dan mulai perjalanan.' },
     step4: { title: 'Dapat Reward', desc: 'Terima BrigaCoins setelah trip selesai.' },
   },
@@ -47,7 +47,7 @@ export const id = {
     vehicles: 'Kendaraan Terdaftar',
   },
   cta: {
-    title: 'Siap bergabung dengan Drivee?',
+    title: 'Siap bergabung dengan Drifee?',
     subtitle: 'Daftar sebagai driver atau kendaraan dan mulai dapatkan reward.',
     driver: 'Daftar Driver',
     vehicle: 'Daftar Kendaraan',
@@ -60,7 +60,7 @@ export const id = {
     privacy: 'Kebijakan Privasi',
     terms: 'Syarat & Ketentuan',
     contact: 'Kontak',
-    copyright: '© 2026 Drivee by Briga. PT Briga Energi Indonesia.',
+    copyright: '© 2026 Drifee by Briga. PT Briga Energi Indonesia.',
   },
   form: {
     next: 'Lanjut',
@@ -74,7 +74,7 @@ export const id = {
   },
   driver: {
     title: 'Pendaftaran Driver',
-    subtitle: 'Lengkapi data diri Anda untuk bergabung dengan Drivee.',
+    subtitle: 'Lengkapi data diri Anda untuk bergabung dengan Drifee.',
     steps: {
       personal: 'Data Pribadi',
       license: 'Data SIM',

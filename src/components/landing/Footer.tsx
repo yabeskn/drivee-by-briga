@@ -23,7 +23,7 @@ export function Footer() {
                 </svg>
               </div>
               <span className="text-lg font-semibold text-white">
-                Drivee
+                Drifee
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-normal ml-1">
                   by Briga
                 </span>

@@ -23,7 +23,7 @@ export function Navbar() {
               </svg>
             </div>
             <span className="text-lg font-semibold text-zinc-900">
-              Drivee
+              Drifee
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 font-normal ml-1">
                 by Briga
               </span>

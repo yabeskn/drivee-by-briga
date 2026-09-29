@@ -1,8 +1,8 @@
-# Drivee by Briga
+# Drifee by Briga
 
-**Smart EV Fleet Telematics PWA** — Track trips, eco-driving score, and earn BrigaCoins rewards.
+**Drive, Earn, and Track safely PWA** — Track trips, eco-driving score, and earn BrigaCoins rewards.
 
-![Drivee Logo](./public/icon.svg)
+![Drifee Logo](./public/icon.svg)
 
 ## Features
 
@@ -51,8 +51,8 @@ npm run dev
 
 | Variable | Description | Default |
 |---|---|---|
-| `NEXT_PUBLIC_APP_URL` | App URL | `https://drivee.briga.id` |
-| `ALLOWED_ORIGINS` | CORS allowed origins | `https://drivee.briga.id` |
+| `NEXT_PUBLIC_APP_URL` | App URL | `https://drifee.briga.id` |
+| `ALLOWED_ORIGINS` | CORS allowed origins | `https://drifee.briga.id` |
 | `OSRM_URL` | OSRM routing server | `https://router.project-osrm.org` |
 
 ## Project Structure
@@ -110,7 +110,7 @@ docker run -p 3000:3000 drivee
 
 ## License
 
-© 2026 Drivee by Briga. PT Briga Energi Indonesia.
+© 2026 Drifee by Briga. PT Briga Energi Indonesia.
 
 ## Contact
 

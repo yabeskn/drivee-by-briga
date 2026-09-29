@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Drivee by Briga",
-  "short_name": "Drivee",
-  "description": "Drivee by Briga — Smart EV Fleet Telematics PWA",
+  "name": "Drifee by Briga",
+  "short_name": "Drifee",
+  "description": "Drifee by Briga — Drive, Earn, and Track safely PWA",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

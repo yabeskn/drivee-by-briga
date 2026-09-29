@@ -40,7 +40,7 @@ export function MobileShell({ children, activeScreen, isOledBlack = false }: Mob
             <span className="font-semibold text-zinc-200">{currentTime}</span>
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
               <ShieldCheck className="w-2.5 h-2.5 mr-0.5" />
-              Drivee
+              Drifee
             </span>
           </div>
 

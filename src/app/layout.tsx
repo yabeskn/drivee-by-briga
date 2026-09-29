@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Drivee by Briga',
-  description: 'Drivee by Briga — Smart EV Fleet Telematics PWA',
+  title: 'Drifee by Briga',
+  description: 'Drifee by Briga — Drive, Earn, and Track safely PWA',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Drivee',
+    title: 'Drifee',
   },
   icons: {
     icon: [

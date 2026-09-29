@@ -3,7 +3,7 @@
 ## Arsitektur
 
 ```
-drivee.briga.id (Cloudflare DNS + CDN + SSL)
+drifee.briga.id (Cloudflare DNS + CDN + SSL)
     ↓
 Vercel (Next.js Hosting + API Routes)
     ↓
@@ -50,7 +50,7 @@ TTL:     Auto
 ### 2.3 Verify DNS
 ```bash
 # Check DNS propagation
-nslookup drivee.briga.id
+nslookup drifee.briga.id
 # Should return: cname.vercel-dns.com
 ```
 
@@ -95,14 +95,14 @@ Always Online: ✅ Enabled
 ```
 Caching → Configuration → Page Rules
 
-Rule 1: drivee.briga.id/_next/static/*
+Rule 1: drifee.briga.id/_next/static/*
   → Cache Level: Cache Everything
   → Edge Cache TTL: 1 month
 
-Rule 2: drivee.briga.id/api/*
+Rule 2: drifee.briga.id/api/*
   → Cache Level: Bypass
 
-Rule 3: drivee.briga.id/sw.js
+Rule 3: drifee.briga.id/sw.js
   → Cache Level: Bypass
 ```
 
@@ -159,27 +159,27 @@ Speed → Optimization → Early Hints
 
 ### 7.1 Check DNS
 ```bash
-dig drivee.briga.id +short
+dig drifee.briga.id +short
 # Should return: cname.vercel-dns.com
 ```
 
 ### 7.2 Check SSL
 ```bash
-curl -I https://drivee.briga.id
+curl -I https://drifee.briga.id
 # Should return: HTTP/2 200
 ```
 
 ### 7.3 Check CORS
 ```bash
-curl -I -X OPTIONS https://drivee.briga.id/api/trips/verify \
-  -H "Origin: https://drivee.briga.id" \
+curl -I -X OPTIONS https://drifee.briga.id/api/trips/verify \
+  -H "Origin: https://drifee.briga.id" \
   -H "Access-Control-Request-Method: POST"
-# Should return: Access-Control-Allow-Origin: https://drivee.briga.id
+# Should return: Access-Control-Allow-Origin: https://drifee.briga.id
 ```
 
 ### 7.4 Check Service Worker
 ```bash
-curl -I https://drivee.briga.id/sw.js
+curl -I https://drifee.briga.id/sw.js
 # Should return: 200 OK
 ```
 
@@ -188,8 +188,8 @@ curl -I https://drivee.briga.id/sw.js
 ## Environment Variables di Vercel
 
 ```
-NEXT_PUBLIC_APP_URL=https://drivee.briga.id
-ALLOWED_ORIGINS=https://drivee.briga.id
+NEXT_PUBLIC_APP_URL=https://drifee.briga.id
+ALLOWED_ORIGINS=https://drifee.briga.id
 OSRM_URL=https://router.project-osrm.org
 ```
 
@@ -198,7 +198,7 @@ OSRM_URL=https://router.project-osrm.org
 ## Troubleshooting
 
 ### Domain tidak bisa diakses
-1. Check DNS propagation: `nslookup drivee.briga.id`
+1. Check DNS propagation: `nslookup drifee.briga.id`
 2. Check Cloudflare proxy status (orange cloud)
 3. Check Vercel domain settings
 
@@ -213,7 +213,7 @@ OSRM_URL=https://router.project-osrm.org
 3. Check Cloudflare WAF rules
 
 ### Service Worker tidak jalan
-1. Check sw.js accessible: `curl -I https://drivee.briga.id/sw.js`
+1. Check sw.js accessible: `curl -I https://drifee.briga.id/sw.js`
 2. Check Cache-Control headers
 3. Check HTTPS (SW requires HTTPS)
 

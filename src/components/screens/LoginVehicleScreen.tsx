@@ -112,12 +112,12 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
           </div>
           <div>
             <h1 className="text-base font-semibold tracking-tight text-white">
-              Drivee
+              Drifee
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal ml-1.5">
                 by Briga
               </span>
             </h1>
-            <p className="text-[11px] text-zinc-500">Smart EV Fleet Telematics</p>
+            <p className="text-[11px] text-zinc-500">Drive, Earn, and Track safely</p>
           </div>
         </div>
 

@@ -4,7 +4,7 @@ const nextConfig = {
 
   // CORS headers — hanya untuk domain PWA kita
   async headers() {
-    const allowedOrigins = process.env.ALLOWED_ORIGINS || 'https://drivee.briga.id';
+    const allowedOrigins = process.env.ALLOWED_ORIGINS || 'https://drifee.briga.id';
 
     return [
       {

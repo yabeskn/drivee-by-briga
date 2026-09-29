@@ -8,7 +8,7 @@ export const en: Translations = {
     login: 'Login',
   },
   hero: {
-    title: 'Smart EV Fleet Telematics',
+    title: 'Drive, Earn, and Track safely',
     subtitle: 'Track trips, eco-driving score, and earn BrigaCoins rewards — all from your smartphone.',
     ctaPrimary: 'Register Now',
     ctaSecondary: 'View Features',
@@ -37,7 +37,7 @@ export const en: Translations = {
     title: 'How It Works',
     subtitle: 'Get started in 4 easy steps',
     step1: { title: 'Register', desc: 'Fill in driver and vehicle registration forms.' },
-    step2: { title: 'Install PWA', desc: 'Add Drivee to your smartphone home screen.' },
+    step2: { title: 'Install PWA', desc: 'Add Drifee to your smartphone home screen.' },
     step3: { title: 'Start Trip', desc: 'Open the app and start your journey.' },
     step4: { title: 'Earn Rewards', desc: 'Receive BrigaCoins after trip completion.' },
   },
@@ -49,7 +49,7 @@ export const en: Translations = {
     vehicles: 'Registered Vehicles',
   },
   cta: {
-    title: 'Ready to join Drivee?',
+    title: 'Ready to join Drifee?',
     subtitle: 'Register as a driver or vehicle and start earning rewards.',
     driver: 'Register Driver',
     vehicle: 'Register Vehicle',
@@ -62,7 +62,7 @@ export const en: Translations = {
     privacy: 'Privacy Policy',
     terms: 'Terms & Conditions',
     contact: 'Contact',
-    copyright: '© 2026 Drivee by Briga. PT Briga Energi Indonesia.',
+    copyright: '© 2026 Drifee by Briga. PT Briga Energi Indonesia.',
   },
   form: {
     next: 'Next',
@@ -76,7 +76,7 @@ export const en: Translations = {
   },
   driver: {
     title: 'Driver Registration',
-    subtitle: 'Complete your personal information to join Drivee.',
+    subtitle: 'Complete your personal information to join Drifee.',
     steps: {
       personal: 'Personal Info',
       license: 'License Info',
