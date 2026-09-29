@@ -1,0 +1,54 @@
+{
+  "agents": [
+    {
+      "id": "agent-1",
+      "name": "Verification Agent 1",
+      "phone": "",
+      "sessionPath": "./sessions/agent-1",
+      "rateLimitPerMinute": 5,
+      "dailyLimit": 100,
+      "status": "inactive",
+      "region": "jakarta"
+    },
+    {
+      "id": "agent-2",
+      "name": "Verification Agent 2",
+      "phone": "",
+      "sessionPath": "./sessions/agent-2",
+      "rateLimitPerMinute": 5,
+      "dailyLimit": 100,
+      "status": "inactive",
+      "region": "surabaya"
+    },
+    {
+      "id": "agent-3",
+      "name": "Verification Agent 3",
+      "phone": "",
+      "sessionPath": "./sessions/agent-3",
+      "rateLimitPerMinute": 5,
+      "dailyLimit": 100,
+      "status": "inactive",
+      "region": "bandung"
+    },
+    {
+      "id": "agent-4",
+      "name": "Verification Agent 4",
+      "phone": "",
+      "sessionPath": "./sessions/agent-4",
+      "rateLimitPerMinute": 5,
+      "dailyLimit": 100,
+      "status": "inactive",
+      "region": "medan"
+    },
+    {
+      "id": "agent-5",
+      "name": "Verification Agent 5",
+      "phone": "",
+      "sessionPath": "./sessions/agent-5",
+      "rateLimitPerMinute": 5,
+      "dailyLimit": 100,
+      "status": "inactive",
+      "region": "makassar"
+    }
+  ]
+}

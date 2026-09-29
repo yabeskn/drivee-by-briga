@@ -18,6 +18,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^1.48.0",
     "next": "^14.2.35",
+    "next-auth": "^4.24.15",
     "postcss": "^8.5.28",
     "prisma": "^8.0.0-rc.17",
     "react": "^18.3.1",
