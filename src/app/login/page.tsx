@@ -44,6 +44,17 @@ function LoginContent() {
     }
   };
 
+  const handleDemoLogin = () => {
+    // Set demo driver data
+    localStorage.setItem('drivee_logged_in', 'true');
+    localStorage.setItem('drivee_driver_id', 'drv_demo_001');
+    localStorage.setItem('drivee_phone', '081234567890');
+    localStorage.setItem('drivee_phone_verified', 'true');
+    localStorage.setItem('drivee_name', 'Budi Santoso (Demo)');
+    localStorage.setItem('drivee_email', 'demo@drifee.id');
+    router.replace('/go');
+  };
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -103,6 +114,29 @@ function LoginContent() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Demo Driver */}
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-zinc-800"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-black text-zinc-500">or</span>
+            </div>
+          </div>
+
+          <button
+            onClick={handleDemoLogin}
+            className="w-full mt-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-colors"
+          >
+            <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Demo Driver (Quick Test)</span>
+          </button>
         </div>
 
         <div className="mt-6 text-center">
