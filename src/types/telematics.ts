@@ -2,6 +2,12 @@ export type DrivingStatus = 'smooth' | 'harsh_accel' | 'sudden_brake' | 'idle';
 
 export type EcoProfile = 'HIGHWAY_NORMAL' | 'URBAN_RUSH_HOUR';
 
+export type VehicleCategory = 'standard' | 'professional' | 'premium' | 'premium_plus';
+
+export type TripType = 'solo' | 'shared';
+
+export type UserType = 'driver' | 'passenger' | 'talent' | 'company';
+
 export interface DriverProfile {
   id: string;
   name: string;
@@ -21,18 +27,20 @@ export interface EVVehicle {
   model: string;
   licensePlate: string;
   batteryCapacityKwh: number;
-  currentSoC: number; // 0 - 100%
+  currentSoC: number;
   estimatedRangeKm: number;
   hubLocation: string;
   status: 'available' | 'in_service' | 'charging';
   efficiencyKwhPer100Km: number;
+  category: VehicleCategory;
+  seats: number;
 }
 
 export interface ActiveDrivingTelemetry {
   speedKmh: number;
   maxSpeedKmh: number;
   speedLimitKmh: number;
-  accelG: number; // m/s^2
+  accelG: number;
   drivingStatus: DrivingStatus;
   statusMessage: string;
   activeProfile: EcoProfile;
@@ -44,7 +52,7 @@ export interface ActiveDrivingTelemetry {
   gpsAccuracyMeters: number;
   isGpsLocked: boolean;
   wakeLockActive: boolean;
-  pollingRateHz: number; // 1Hz, 0.2Hz, 0.067Hz
+  pollingRateHz: number;
   osrmMatched: boolean;
 }
 
@@ -91,16 +99,157 @@ export interface TripRecord {
   esg_co2_avoided_kg: number;
 }
 
-// ── Anti-Spoofing Photo Evidence ─────────────────────────────
-
 export interface PhotoEvidence {
-  odometerPhoto: string | null;  // base64 compressed JPEG
-  batteryPhoto: string | null;   // base64 compressed JPEG
-  capturedAt: number;            // epoch ms
+  odometerPhoto: string | null;
+  batteryPhoto: string | null;
+  capturedAt: number;
   gpsLocation: { lat: number; lng: number } | null;
 }
 
 export interface TripPhotoEvidence {
   start: PhotoEvidence;
   end: PhotoEvidence;
+}
+
+// ── BrigaCoin Types ─────────────────────────────────────────
+
+export interface BrigaCoinBalance {
+  driverId: string;
+  balance: number;
+  totalEarned: number;
+  totalSpent: number;
+  lastUpdated: Date;
+}
+
+export interface BrigaCoinTransaction {
+  id: string;
+  driverId: string;
+  type: 'earn' | 'spend' | 'expire' | 'adjust';
+  amount: number;
+  balance: number;
+  source: 'trip' | 'bonus' | 'redemption' | 'referral' | 'adjustment' | 'carbon_offset';
+  referenceId?: string;
+  description: string;
+  expiresAt?: Date;
+  createdAt: Date;
+}
+
+export interface Reward {
+  id: string;
+  name: string;
+  description: string;
+  category: 'internal' | 'voucher' | 'ewallet' | 'transport' | 'insurance' | 'maintenance' | 'carbon';
+  cost: number;
+  stock: number;
+  image: string;
+  terms: string;
+  type: 'feature' | 'discount' | 'voucher' | 'auto_credit' | 'physical' | 'service';
+  partnerId?: string;
+  vehicleCategory?: VehicleCategory | 'all';
+  userType: UserType | 'all';
+  status: 'active' | 'inactive' | 'out_of_stock';
+}
+
+export interface Redemption {
+  id: string;
+  driverId: string;
+  rewardId: string;
+  cost: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  voucherCode?: string;
+  deliveryMethod: 'email' | 'whatsapp' | 'auto';
+  redeemedAt?: Date;
+  expiresAt?: Date;
+  createdAt: Date;
+}
+
+// ── HR Rental Types ─────────────────────────────────────────
+
+export interface RentalOrder {
+  id: string;
+  companyId: string;
+  packageType: 'basic' | 'family' | 'executive' | 'executive_plus' | 'weekly' | 'monthly';
+  vehicleId: string;
+  driverId: string;
+  startDate: Date;
+  endDate: Date;
+  totalPrice: number;
+  paymentStatus: 'pending' | 'paid' | 'verified';
+  paymentMethod: 'transfer' | 'va' | 'qris';
+  paymentReference: string;
+  createdAt: Date;
+}
+
+export interface Scope3Emission {
+  id: string;
+  companyId: string;
+  rentalId: string;
+  category: 'business_travel' | 'commuting' | 'downstream';
+  distanceKm: number;
+  emissionFactor: number;
+  totalEmissionKg: number;
+  offsetKg: number;
+  netEmissionKg: number;
+  brcEarned: number;
+  createdAt: Date;
+}
+
+export interface CarbonOffset {
+  id: string;
+  companyId: string;
+  amountKg: number;
+  type: 'reforestation' | 'renewable' | 'capture';
+  cost: number;
+  brcEarned: number;
+  certificateUrl?: string;
+  createdAt: Date;
+}
+
+// ── Special Track Types ─────────────────────────────────────
+
+export interface SpecialTrackJob {
+  id: string;
+  companyId: string;
+  title: string;
+  description: string;
+  requirements: string[];
+  vehicleCategory?: VehicleCategory;
+  minEcoScore?: number;
+  status: 'open' | 'closed' | 'filled';
+  createdAt: Date;
+}
+
+export interface SpecialTrackApplication {
+  id: string;
+  jobId: string;
+  driverId: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  appliedAt: Date;
+}
+
+// ── Unified User Types ──────────────────────────────────────
+
+export interface UnifiedUser {
+  id: string;
+  email: string;
+  type: UserType;
+  drifeeProfile?: {
+    driverId?: string;
+    passengerId?: string;
+    ecoScore?: number;
+    totalTrips?: number;
+    totalRides?: number;
+    vehicleCategory?: VehicleCategory;
+  };
+  brigaidProfile?: {
+    talentId?: string;
+    companyId?: string;
+    specialTrack?: boolean;
+    verifiedDriver?: boolean;
+  };
+  wallet: {
+    balance: number;
+    currency: 'BRC';
+    lastUpdated: Date;
+  };
 }

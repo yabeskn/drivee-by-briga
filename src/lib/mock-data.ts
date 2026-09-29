@@ -25,6 +25,8 @@ export const MOCK_VEHICLES: EVVehicle[] = [
     hubLocation: 'Cikarang Dry Port Hub',
     status: 'available',
     efficiencyKwhPer100Km: 16.7,
+    category: 'premium',
+    seats: 4,
   },
   {
     id: 'ev_byd_atto_01',
@@ -38,6 +40,8 @@ export const MOCK_VEHICLES: EVVehicle[] = [
     hubLocation: 'Halim Perdanakusuma Hub',
     status: 'available',
     efficiencyKwhPer100Km: 15.5,
+    category: 'professional',
+    seats: 6,
   },
   {
     id: 'ev_wuling_binguo_03',
@@ -51,6 +55,8 @@ export const MOCK_VEHICLES: EVVehicle[] = [
     hubLocation: 'Bandara Soekarno-Hatta T3',
     status: 'available',
     efficiencyKwhPer100Km: 12.8,
+    category: 'standard',
+    seats: 4,
   },
 ];
 
