@@ -51,6 +51,7 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    localStorage.setItem('drivee_logged_in', 'true');
     setIsLoggedIn(true);
     setStep('vehicle');
   };
