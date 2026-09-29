@@ -373,9 +373,10 @@ export function EndTripDashboard({
           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
             verificationStatus === 'VERIFIED' ? 'bg-emerald-950 text-emerald-400 border-emerald-800/40'
             : verificationStatus === 'REJECTED' ? 'bg-red-950 text-red-400 border-red-800/40'
+            : verificationStatus === 'QUEUED' ? 'bg-amber-950 text-amber-400 border-amber-800/40'
             : 'bg-zinc-900 text-zinc-400 border-zinc-800'
           }`}>
-            {isSubmitting ? 'VERIFYING' : verificationStatus}
+            {isSubmitting ? 'VERIFYING' : verificationStatus === 'QUEUED' ? 'OFFLINE QUEUED' : verificationStatus}
           </span>
         </div>
         <div className="p-2 bg-zinc-900 rounded-lg text-[10px] text-zinc-400 break-all select-all flex items-center justify-between gap-2 border border-zinc-800">
@@ -394,6 +395,12 @@ export function EndTripDashboard({
             {copiedHash ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
         </div>
+        {submissionResult && verificationStatus === 'QUEUED' && (
+          <div className="mt-2 text-[10px] text-amber-400 font-medium flex items-center gap-1">
+            <AlertCircle className="w-3 h-3" />
+            Offline — trip disimpan ke antrian lokal. Akan dikirim otomatis saat koneksi kembali.
+          </div>
+        )}
         {submissionResult && verificationStatus === 'REJECTED' && (
           <div className="mt-2 text-[10px] text-red-400 font-medium flex items-center gap-1">
             <AlertCircle className="w-3 h-3" />

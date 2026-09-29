@@ -41,9 +41,20 @@ export interface TripSession {
   status: 'active' | 'completed' | 'synced';
 }
 
+/** Offline queue entry — pengganti localStorage (no 5MB limit) */
+export interface OfflineQueueEntry {
+  id?: number;
+  tripId: string;
+  payload: string;           // JSON.stringify'd payload (to avoid Dexie clone issues)
+  createdAt: number;
+  retryCount: number;
+  status: 'pending' | 'syncing' | 'failed';
+}
+
 class BrigaTelematicsDB extends Dexie {
   telemetryPoints!: EntityTable<TelemetryPoint, 'id'>;
   tripSessions!: EntityTable<TripSession, 'id'>;
+  offlineQueue!: EntityTable<OfflineQueueEntry, 'id'>;
 
   constructor() {
     super('briga_telematics');
@@ -51,6 +62,13 @@ class BrigaTelematicsDB extends Dexie {
     this.version(1).stores({
       telemetryPoints: '++id, tripId, timestamp, drivingStatus',
       tripSessions: '++id, tripId, driverId, vehicleId, status',
+    });
+
+    // v2: Add offline queue table (IndexedDB-backed, no 5MB localStorage limit)
+    this.version(2).stores({
+      telemetryPoints: '++id, tripId, timestamp, drivingStatus',
+      tripSessions: '++id, tripId, driverId, vehicleId, status',
+      offlineQueue: '++id, tripId, status, createdAt',
     });
   }
 }

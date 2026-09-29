@@ -14,6 +14,10 @@ const IDLE_THRESHOLD_MS = 60_000; // durasi 0 km/h sebelum turun ke idle-poll
 
 const BATCH_WRITE_INTERVAL_MS = 30_000; // flush ke IndexedDB tiap 30 detik
 
+// FIX B3: Throttle display updates — max 0.5 Hz (every 2s)
+// Reduces React re-renders from ~2/s to ~0.5/s, saving battery
+const DISPLAY_THROTTLE_MS = 2_000;
+
 // Driving-behaviour thresholds (m/s²)
 const HARSH_ACCEL_THRESHOLD = 2.5;
 const HARSH_BRAKE_THRESHOLD = -3.0;
@@ -149,6 +153,7 @@ export function useTelematics({
   const flushedCountRef = useRef(0);
   const prevSpeedRef = useRef(0);
   const mockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastRenderRef = useRef(0); // FIX B3: throttle display updates
 
   // ── Classify driving status from acceleration ─────────────
   const classifyDriving = useCallback(
@@ -335,7 +340,7 @@ export function useTelematics({
 
         prevSpeedRef.current = calculatedSpeedKmh;
 
-        // ── Push telemetry point to in-memory buffer ──
+        // ── Push telemetry point to in-memory buffer (always, unthrottled) ──
         const point: TelemetryPoint = {
           tripId,
           timestamp: now,
@@ -356,33 +361,40 @@ export function useTelematics({
         };
         bufferRef.current.push(point);
 
-        // ── Update React state ──
-        setState((s) => ({
-          ...s,
-          lat: latitude,
-          lng: longitude,
-          accuracy,
-          speedKmh: calculatedSpeedKmh,
-          heading: heading ?? null,
-          altitude: altitude ?? null,
-          isGpsLocked: accuracy < 20,
-          accelX: accel.x,
-          accelY: accel.y,
-          accelZ: accel.z,
-          accelMagnitude: accel.mag,
-          currentPollingMs: intervalMs,
-          pollingTier: tier,
-          zeroSpeedDurationMs: zeroMs,
-          tripDistanceKm: Math.round(totalDistanceRef.current * 100) / 100,
-          maxSpeedKmh: Math.max(s.maxSpeedKmh, calculatedSpeedKmh),
-          pointsBuffered: bufferRef.current.length,
-          drivingStatus,
-          statusMessage,
-          harshAccelCount: harshAccelRef.current,
-          harshBrakeCount: harshBrakeRef.current,
-          idleDurationSec: Math.round(idleDurRef.current),
-          sensorError: null,
-        }));
+        // ── FIX B3: Throttle React state updates (max 0.5 Hz) ──
+        // Always force update on driving events (harsh accel/brake) for driver safety
+        const isUrgent = drivingStatus === 'harsh_accel' || drivingStatus === 'sudden_brake';
+        const timeSinceLastRender = now - lastRenderRef.current;
+
+        if (isUrgent || timeSinceLastRender >= DISPLAY_THROTTLE_MS) {
+          lastRenderRef.current = now;
+          setState((s) => ({
+            ...s,
+            lat: latitude,
+            lng: longitude,
+            accuracy,
+            speedKmh: calculatedSpeedKmh,
+            heading: heading ?? null,
+            altitude: altitude ?? null,
+            isGpsLocked: accuracy < 20,
+            accelX: accel.x,
+            accelY: accel.y,
+            accelZ: accel.z,
+            accelMagnitude: accel.mag,
+            currentPollingMs: intervalMs,
+            pollingTier: tier,
+            zeroSpeedDurationMs: zeroMs,
+            tripDistanceKm: Math.round(totalDistanceRef.current * 100) / 100,
+            maxSpeedKmh: Math.max(s.maxSpeedKmh, calculatedSpeedKmh),
+            pointsBuffered: bufferRef.current.length,
+            drivingStatus,
+            statusMessage,
+            harshAccelCount: harshAccelRef.current,
+            harshBrakeCount: harshBrakeRef.current,
+            idleDurationSec: Math.round(idleDurRef.current),
+            sensorError: null,
+          }));
+        }
 
         // ── Schedule next poll ──
         pollTimerRef.current = setTimeout(pollGps, intervalMs);
@@ -562,13 +574,13 @@ export function useTelematics({
       startMockSensors();
     }
 
-    // ── 4. Trip duration counter (always runs at 1 Hz) ──
+    // ── 4. Trip duration counter (synced with display throttle) ──
     durationTimerRef.current = setInterval(() => {
       setState((s) => ({
         ...s,
         tripDurationSec: Math.round((Date.now() - tripStartRef.current) / 1000),
       }));
-    }, 1000);
+    }, DISPLAY_THROTTLE_MS);
 
     // ── 5. Batch-write timer → IndexedDB every 30s ──
     batchTimerRef.current = setInterval(flushBuffer, BATCH_WRITE_INTERVAL_MS);

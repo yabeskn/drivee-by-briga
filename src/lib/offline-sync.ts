@@ -3,120 +3,152 @@
 //
 // Menyimpan submission trip ke IndexedDB saat offline,
 // dan auto-sync saat koneksi kembali.
+//
+// FIX B1+B2: Migrasi dari localStorage (5MB limit) ke
+// IndexedDB (offlineQueue table) agar trip multi-jam
+// Jabodetabek tidak kehilangan data.
 // ─────────────────────────────────────────────────────────────
 
-import { db } from './db';
+import { db, type OfflineQueueEntry } from './db';
+import { purgeVerifiedTrip, purgeOldTrips } from './db';
 
-// ── Types ───────────────────────────────────────────────────
-export interface QueuedSubmission {
-  id?: number;
-  tripId: string;
-  payload: unknown;
-  createdAt: number;
-  retryCount: number;
-  status: 'pending' | 'syncing' | 'failed';
-}
-
-// ── DB Schema Extension ─────────────────────────────────────
-// We'll use a separate object store for offline submissions
-// This is handled by adding to the existing Dexie db
-
-// ── Queue Management ────────────────────────────────────────
+// ── Queue Management (IndexedDB-backed) ─────────────────────
 
 /**
- * Add a submission to the offline queue
+ * Add a submission to the offline queue (IndexedDB).
+ * Called by trip-submitter when fetch fails due to offline.
  */
 export async function queueSubmission(tripId: string, payload: unknown): Promise<number> {
-  const submission: QueuedSubmission = {
+  const entry: OfflineQueueEntry = {
     tripId,
-    payload,
+    payload: JSON.stringify(payload), // Stringify to avoid Dexie clone issues
     createdAt: Date.now(),
     retryCount: 0,
     status: 'pending',
   };
 
-  // Store in a simple array in localStorage as fallback
-  // In production, this would be a separate IndexedDB table
-  const queue = getQueue();
-  queue.push(submission);
-  localStorage.setItem('briga_offline_queue', JSON.stringify(queue));
-
-  return queue.length - 1;
+  const id = await db.offlineQueue.add(entry);
+  console.log(`[OfflineSync] Queued trip ${tripId} (entry #${id})`);
+  return id as number;
 }
 
 /**
- * Get all pending submissions
+ * Get all pending submissions from IndexedDB
  */
-export function getQueue(): QueuedSubmission[] {
-  try {
-    const data = localStorage.getItem('briga_offline_queue');
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
+export async function getQueue(): Promise<OfflineQueueEntry[]> {
+  return db.offlineQueue.toArray();
 }
 
 /**
- * Clear the queue
+ * Get pending count for UI display
  */
-export function clearQueue(): void {
-  localStorage.removeItem('briga_offline_queue');
+export async function getPendingCount(): Promise<number> {
+  return db.offlineQueue.where('status').equals('pending').count();
 }
 
 /**
- * Remove a specific submission from queue
+ * Clear the entire queue
  */
-export function removeFromQueue(index: number): void {
-  const queue = getQueue();
-  queue.splice(index, 1);
-  localStorage.setItem('briga_offline_queue', JSON.stringify(queue));
+export async function clearQueue(): Promise<void> {
+  await db.offlineQueue.clear();
+}
+
+/**
+ * Remove a specific entry by id
+ */
+export async function removeFromQueue(entryId: number): Promise<void> {
+  await db.offlineQueue.delete(entryId);
 }
 
 /**
  * Update submission status
  */
-export function updateSubmissionStatus(index: number, status: QueuedSubmission['status']): void {
-  const queue = getQueue();
-  if (queue[index]) {
-    queue[index].status = status;
-    localStorage.setItem('briga_offline_queue', JSON.stringify(queue));
+export async function updateSubmissionStatus(
+  entryId: number,
+  status: OfflineQueueEntry['status'],
+  incrementRetry = false,
+): Promise<void> {
+  const updates: Partial<OfflineQueueEntry> = { status };
+  if (incrementRetry) {
+    const entry = await db.offlineQueue.get(entryId);
+    if (entry) {
+      updates.retryCount = (entry.retryCount || 0) + 1;
+    }
   }
+  await db.offlineQueue.update(entryId, updates);
 }
 
 /**
- * Process all pending submissions
- * Called when connection is restored
+ * Process all pending submissions when connection is restored.
+ * Returns count of successfully synced trips.
  */
-export async function processQueue(): Promise<void> {
-  const queue = getQueue();
-  if (queue.length === 0) return;
+export async function processQueue(): Promise<number> {
+  const pending = await db.offlineQueue
+    .where('status')
+    .anyOf('pending', 'failed')
+    .toArray();
 
-  console.log(`[OfflineSync] Processing ${queue.length} pending submissions...`);
+  if (pending.length === 0) return 0;
 
-  for (let i = 0; i < queue.length; i++) {
-    const submission = queue[i];
-    if (submission.status === 'syncing') continue;
+  console.log(`[OfflineSync] Processing ${pending.length} pending submissions...`);
+  let syncedCount = 0;
 
-    updateSubmissionStatus(i, 'syncing');
+  for (const entry of pending) {
+    if (!entry.id) continue;
+
+    // Skip entries that have been retried too many times
+    if (entry.retryCount >= 5) {
+      console.warn(`[OfflineSync] Skipping trip ${entry.tripId} — max retries exceeded`);
+      continue;
+    }
+
+    await updateSubmissionStatus(entry.id, 'syncing');
 
     try {
+      const payload = JSON.parse(entry.payload);
+
       const response = await fetch('/api/trips/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submission.payload),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        removeFromQueue(i);
-        i--; // Adjust index after removal
-        console.log(`[OfflineSync] Synced submission for trip ${submission.tripId}`);
+        const result = await response.json();
+
+        // Auto-purge telemetry points if verified
+        if (result.status === 'VERIFIED' || result.verification_status === 'VERIFIED') {
+          try {
+            await purgeVerifiedTrip(entry.tripId);
+          } catch (purgeErr) {
+            console.warn(`[OfflineSync] Purge failed for ${entry.tripId}:`, purgeErr);
+          }
+        }
+
+        // Remove from queue on success
+        await removeFromQueue(entry.id);
+        syncedCount++;
+        console.log(`[OfflineSync] ✅ Synced trip ${entry.tripId}`);
       } else {
-        updateSubmissionStatus(i, 'failed');
+        // Server responded but with error
+        await updateSubmissionStatus(entry.id, 'failed', true);
+        console.warn(`[OfflineSync] Server rejected trip ${entry.tripId}: ${response.status}`);
       }
-    } catch {
-      updateSubmissionStatus(i, 'failed');
+    } catch (err) {
+      // Network error — still offline, put back to pending
+      await updateSubmissionStatus(entry.id, 'failed', true);
+      console.warn(`[OfflineSync] Network error for trip ${entry.tripId}:`, err);
     }
   }
+
+  // Safety net: purge old synced trips
+  try {
+    await purgeOldTrips(24 * 60 * 60 * 1000);
+  } catch {
+    // Non-critical
+  }
+
+  return syncedCount;
 }
 
 /**
@@ -127,41 +159,88 @@ export function isOnline(): boolean {
 }
 
 /**
- * Setup online/offline event listeners
+ * Setup online/offline event listeners.
+ * Automatically processes queue when connectivity returns.
  */
-export function setupOnlineSync(callback?: () => void): () => void {
-  const handleOnline = () => {
+export function setupOnlineSync(callback?: (syncedCount: number) => void): () => void {
+  const handleOnline = async () => {
     console.log('[OfflineSync] Connection restored, processing queue...');
-    processQueue();
-    callback?.();
+    const synced = await processQueue();
+    callback?.(synced);
   };
 
   const handleOffline = () => {
-    console.log('[OfflineSync] Connection lost');
+    console.log('[OfflineSync] Connection lost — data will be queued to IndexedDB');
+  };
+
+  // Also listen for SW background sync messages
+  const handleMessage = (event: MessageEvent) => {
+    if (event.data?.type === 'SYNC_TRIP_DATA') {
+      processQueue();
+    }
   };
 
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
+  navigator.serviceWorker?.addEventListener('message', handleMessage);
 
   // Return cleanup function
   return () => {
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
+    navigator.serviceWorker?.removeEventListener('message', handleMessage);
   };
 }
 
 /**
  * Get queue status for UI display
  */
-export function getQueueStatus(): {
+export async function getQueueStatus(): Promise<{
   pending: number;
   failed: number;
   total: number;
-} {
-  const queue = getQueue();
+}> {
+  const all = await db.offlineQueue.toArray();
   return {
-    pending: queue.filter((s) => s.status === 'pending').length,
-    failed: queue.filter((s) => s.status === 'failed').length,
-    total: queue.length,
+    pending: all.filter((s) => s.status === 'pending').length,
+    failed: all.filter((s) => s.status === 'failed').length,
+    total: all.length,
   };
+}
+
+/**
+ * Migrate any leftover localStorage queue data to IndexedDB.
+ * Call once on app startup for backwards compatibility.
+ */
+export async function migrateLocalStorageQueue(): Promise<number> {
+  try {
+    const raw = localStorage.getItem('briga_offline_queue');
+    if (!raw) return 0;
+
+    const items = JSON.parse(raw) as Array<{
+      tripId: string;
+      payload: unknown;
+      createdAt: number;
+      retryCount: number;
+      status: string;
+    }>;
+
+    if (items.length === 0) return 0;
+
+    const entries: OfflineQueueEntry[] = items.map((item) => ({
+      tripId: item.tripId,
+      payload: typeof item.payload === 'string' ? item.payload : JSON.stringify(item.payload),
+      createdAt: item.createdAt,
+      retryCount: item.retryCount || 0,
+      status: (item.status === 'pending' || item.status === 'failed') ? item.status : 'pending',
+    }));
+
+    await db.offlineQueue.bulkAdd(entries);
+    localStorage.removeItem('briga_offline_queue');
+
+    console.log(`[OfflineSync] Migrated ${entries.length} entries from localStorage to IndexedDB`);
+    return entries.length;
+  } catch {
+    return 0;
+  }
 }

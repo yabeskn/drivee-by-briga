@@ -7,9 +7,12 @@
 //   profile_used, distance_km, telemetry_summary, eco_score,
 //   tokens_earned, trip_hash, verification_status
 // }
+//
+// FIX B5: Server-side hash re-computation for verification
 // ─────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 
 // ── Types ───────────────────────────────────────────────────
 interface TripVerifyRequest {
@@ -55,9 +58,7 @@ interface TripVerifyRequest {
   };
 }
 
-// ── Response Schema (Data Schema Specification) ─────────────
 interface TripVerifyResponse {
-  // Mandatory keys
   trip_id: string;
   driver_id: string;
   vehicle_id: string;
@@ -77,11 +78,11 @@ interface TripVerifyResponse {
   tokens_earned: number;
   trip_hash: string;
   verification_status: 'VERIFIED' | 'REJECTED' | 'PENDING';
-  // Bonus fields (for debugging)
   verification_details?: {
     osrm_matched: boolean;
     physics_check_passed: boolean;
     anti_spoofing_passed: boolean;
+    hash_verified: boolean;
     gaps_interpolated: number;
     token_breakdown: {
       base_reward: number;
@@ -93,6 +94,71 @@ interface TripVerifyResponse {
     };
   };
   message: string;
+}
+
+// ── FIX B5: Server-side Hash Verification ───────────────────
+
+/**
+ * Re-compute SHA-256 hash from trip payload and compare with client hash.
+ * This prevents tampering with trip data.
+ */
+function recomputeTripHash(data: TripVerifyRequest): string {
+  // Build canonical payload (sorted keys for determinism)
+  const canonicalPayload = {
+    trip_id: data.trip_id,
+    driver_id: data.driver_id,
+    vehicle_id: data.vehicle_id,
+    start_time: data.start_time,
+    end_time: data.end_time,
+    profile_used: data.profile_used,
+    start_battery_soc: data.start_battery_soc,
+    end_battery_soc: data.end_battery_soc,
+    start_odometer_km: data.start_odometer_km,
+    end_odometer_km: data.end_odometer_km,
+    distance_km: data.distance_km,
+    energy_used_kwh: data.energy_used_kwh,
+    eco_score: data.eco_score,
+    eco_grade: data.eco_grade,
+    tokens_earned: data.tokens_earned,
+    esg_co2_avoided_kg: data.esg_co2_avoided_kg,
+  };
+
+  // Sort keys recursively for deterministic output
+  const sortedPayload = sortKeysRecursively(canonicalPayload);
+
+  // Compute SHA-256 hash
+  const hash = createHash('sha256')
+    .update(JSON.stringify(sortedPayload))
+    .digest('hex');
+
+  return hash;
+}
+
+function sortKeysRecursively(obj: Record<string, unknown>): Record<string, unknown> {
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(obj).sort()) {
+    const value = obj[key];
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      sorted[key] = sortKeysRecursively(value as Record<string, unknown>);
+    } else {
+      sorted[key] = value;
+    }
+  }
+  return sorted;
+}
+
+function verifyHash(data: TripVerifyRequest): { verified: boolean; reason: string } {
+  const serverHash = recomputeTripHash(data);
+  const clientHash = data.trip_hash;
+
+  if (serverHash === clientHash) {
+    return { verified: true, reason: 'Hash matches' };
+  }
+
+  return {
+    verified: false,
+    reason: `Hash mismatch: server=${serverHash.slice(0, 16)}..., client=${clientHash.slice(0, 16)}...`,
+  };
 }
 
 // ── Anti-Spoofing Validation ───────────────────────────────
@@ -239,6 +305,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           osrm_matched: false,
           physics_check_passed: false,
           anti_spoofing_passed: false,
+          hash_verified: false,
           gaps_interpolated: 0,
           token_breakdown: {
             base_reward: 0,
@@ -274,6 +341,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           osrm_matched: false,
           physics_check_passed: false,
           anti_spoofing_passed: true,
+          hash_verified: false,
           gaps_interpolated: 0,
           token_breakdown: {
             base_reward: 0,
@@ -289,13 +357,49 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(response, { status: 200 });
     }
 
-    // 3. OSRM map matching
+    // FIX B5: 3. Verify hash (server-side re-computation)
+    const hashVerification = verifyHash(data);
+    if (!hashVerification.verified) {
+      const response: TripVerifyResponse = {
+        trip_id: data.trip_id,
+        driver_id: data.driver_id,
+        vehicle_id: data.vehicle_id,
+        start_time: data.start_time,
+        end_time: data.end_time,
+        profile_used: data.profile_used,
+        distance_km: data.distance_km,
+        telemetry_summary: data.telemetry_summary,
+        eco_score: data.eco_score,
+        tokens_earned: 0,
+        trip_hash: data.trip_hash,
+        verification_status: 'REJECTED',
+        verification_details: {
+          osrm_matched: false,
+          physics_check_passed: true,
+          anti_spoofing_passed: true,
+          hash_verified: false,
+          gaps_interpolated: 0,
+          token_breakdown: {
+            base_reward: 0,
+            eco_multiplier: 0,
+            multiplier_reward: 0,
+            streak_bonus: 0,
+            anti_spoofing_bonus: 0,
+            total_reward: 0,
+          },
+        },
+        message: `Hash verification failed: ${hashVerification.reason}`,
+      };
+      return NextResponse.json(response, { status: 200 });
+    }
+
+    // 4. OSRM map matching
     const osrmResult = osrmMapMatching(data.gps_points);
 
-    // 4. Calculate tokens
+    // 5. Calculate tokens
     const tokenBreakdown = calculateTokens(data, true);
 
-    // 5. Build response (Data Schema Specification)
+    // 6. Build response (Data Schema Specification)
     const response: TripVerifyResponse = {
       trip_id: data.trip_id,
       driver_id: data.driver_id,
@@ -313,6 +417,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         osrm_matched: osrmResult.matched,
         physics_check_passed: true,
         anti_spoofing_passed: true,
+        hash_verified: true,
         gaps_interpolated: osrmResult.gaps_interpolated,
         token_breakdown: tokenBreakdown,
       },

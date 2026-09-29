@@ -7,7 +7,8 @@
 // 3. POST ke /api/trips/verify
 // 4. Parse response (Data Schema Specification)
 // 5. Jika VERIFIED → auto-purge IndexedDB
-// 6. Return hasil ke UI
+// 6. Jika OFFLINE → queue ke IndexedDB (bukan localStorage!)
+// 7. Return hasil ke UI
 // ─────────────────────────────────────────────────────────────
 
 import { db, getTripPoints, purgeVerifiedTrip, purgeOldTrips, type PurgeResult } from '@/lib/db';
@@ -21,6 +22,7 @@ import {
 } from '@/lib/eco-score';
 import type { TripTelemetrySummary, EcoProfile, PhotoEvidence } from '@/types/telematics';
 import type { TelematicsState } from '@/hooks/useTelematics';
+import { queueSubmission, isOnline } from '@/lib/offline-sync';
 
 // ── Types ───────────────────────────────────────────────────
 export interface TripSubmissionInput {
@@ -44,7 +46,7 @@ export interface TripSubmissionInput {
 
 export interface TripSubmissionResult {
   success: boolean;
-  verificationStatus: 'VERIFIED' | 'REJECTED' | 'ERROR';
+  verificationStatus: 'VERIFIED' | 'REJECTED' | 'ERROR' | 'QUEUED';
   ecoScore: EcoScoreResult;
   tokenReward: TokenRewardResult;
   co2AvoidedKg: number;
@@ -212,20 +214,61 @@ export async function submitAndVerifyTrip(
     if (resp.tokens_earned !== undefined && resp.tokens_earned > 0) {
       tokenReward.totalReward = resp.tokens_earned;
     }
-  } catch (err) {
-    return {
-      success: false,
-      verificationStatus: 'ERROR',
-      ecoScore,
-      tokenReward,
-      co2AvoidedKg,
-      tripHash: hashResult.hash,
-      purge: null,
-      matchedRoute: null,
-      serverResponse,
-      errorMessage: `Server request failed: ${(err as Error).message}`,
-    };
-  }
+    } catch (err) {
+      // ── OFFLINE FALLBACK: Queue to IndexedDB ──
+      // Trip data is preserved and will auto-sync when connectivity returns
+      const offlinePayload = {
+        trip_id: tripId,
+        driver_id: driverId,
+        vehicle_id: vehicleId,
+        start_time: startTime,
+        end_time: endTime,
+        profile_used: ecoScore.profileUsed,
+        start_battery_soc: startBatterySoc,
+        end_battery_soc: endBatterySoc,
+        start_odometer_km: startOdometerKm,
+        end_odometer_km: endOdometerKm,
+        distance_km: distanceKm,
+        energy_used_kwh: energyUsedKwh,
+        telemetry_summary: telemetrySummary,
+        eco_score: ecoScore.score,
+        eco_grade: ecoScore.grade,
+        tokens_earned: tokenReward.totalReward,
+        esg_co2_avoided_kg: co2AvoidedKg,
+        trip_hash: hashResult.hash,
+        gps_points: gpsPoints,
+      };
+
+      try {
+        await queueSubmission(tripId, offlinePayload);
+        console.log(`[submit] Trip ${tripId} queued to IndexedDB (offline)`);
+        return {
+          success: false,
+          verificationStatus: 'QUEUED' as const,
+          ecoScore,
+          tokenReward,
+          co2AvoidedKg,
+          tripHash: hashResult.hash,
+          purge: null,
+          matchedRoute: null,
+          serverResponse: null,
+          errorMessage: 'Offline — trip disimpan ke antrian lokal. Akan dikirim otomatis saat koneksi kembali.',
+        };
+      } catch (queueErr) {
+        return {
+          success: false,
+          verificationStatus: 'ERROR' as const,
+          ecoScore,
+          tokenReward,
+          co2AvoidedKg,
+          tripHash: hashResult.hash,
+          purge: null,
+          matchedRoute: null,
+          serverResponse,
+          errorMessage: `Offline queue failed: ${(queueErr as Error).message}`,
+        };
+      }
+    }
 
   // ── 9. Auto-purge IndexedDB on VERIFIED ──
   let purge: PurgeResult | null = null;

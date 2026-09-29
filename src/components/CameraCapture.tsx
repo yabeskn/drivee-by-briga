@@ -84,6 +84,30 @@ export function CameraCapture({
     setIsStreaming(false);
   };
 
+  // FIX B7: Compress photo to max ~200KB to reduce payload size
+  const compressPhoto = useCallback((dataUrl: string): string => {
+    const img = new Image();
+    img.src = dataUrl;
+
+    // Calculate dimensions (max 800px width)
+    const maxWidth = 800;
+    const scale = Math.min(1, maxWidth / img.width);
+    const width = Math.round(img.width * scale);
+    const height = Math.round(img.height * scale);
+
+    // Draw to canvas with compression
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return dataUrl;
+
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // Compress to JPEG with quality 0.6 (target ~200KB)
+    return canvas.toDataURL('image/jpeg', 0.6);
+  }, []);
+
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
 
@@ -99,8 +123,8 @@ export function CameraCapture({
     // Draw video frame to canvas
     ctx.drawImage(video, 0, 0);
 
-    // Compress to JPEG (max ~500KB)
-    const quality = 0.7;
+    // FIX B7: Compress to JPEG (max ~200KB)
+    const quality = 0.6;
     const base64 = canvas.toDataURL('image/jpeg', quality);
 
     if (mode === 'odometer') {
