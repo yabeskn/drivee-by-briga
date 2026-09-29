@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { agentManager } from '@/lib/baileys/manager';
-import { createHash, randomBytes } from 'crypto';
-
-// In-memory store (use Redis/Database in production)
-const verificationStore = new Map<string, {
-  token: string;
-  phone: string;
-  createdAt: number;
-  expiresAt: number;
-  verified: boolean;
-}>();
+import {
+  createVerificationToken,
+  verifyToken,
+  generateDeviceId,
+  getTokenStatus,
+} from '@/lib/verification-store';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -22,37 +18,41 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Generate unique token
-    const token = randomBytes(32).toString('hex');
-    const now = Date.now();
-    const expiresAt = now + 10 * 60 * 1000; // 10 minutes
+    // Get client info
+    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    const deviceId = generateDeviceId();
 
-    // Store verification data
-    verificationStore.set(token, {
-      token,
-      phone,
-      createdAt: now,
-      expiresAt,
-      verified: false,
-    });
+    // Create verification token
+    const result = createVerificationToken(phone, 'phone_verification', ipAddress, userAgent, deviceId);
+
+    if ('error' in result) {
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 429 }
+      );
+    }
+
+    const token = result;
 
     // Generate verification link
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://drivee.briga.id';
-    const verifyLink = `${baseUrl}/verify?token=${token}`;
+    const verifyLink = `${baseUrl}/verify?token=${token.token}`;
 
     // Send WhatsApp message
-    const message = `Verifikasi nomor HP Anda di Drivee by Briga.\n\nKlik link berikut untuk verifikasi:\n${verifyLink}\n\nLink berlaku 10 menit.`;
-    const result = await agentManager.sendMessage(phone, message);
+    const message = `Verifikasi nomor HP Anda di Drivee by Briga.\n\nKlik link berikut untuk verifikasi:\n${verifyLink}\n\nLink berlaku 5 menit.`;
+    const waResult = await agentManager.sendMessage(phone, message);
 
-    if (!result.success) {
+    if (!waResult.success) {
       // Fallback: return link directly (for testing without active agents)
       return NextResponse.json({
         success: true,
         message: 'Verification link generated (WhatsApp not available)',
         data: {
-          token,
+          token: token.token,
           verifyLink,
-          expiresAt,
+          expiresAt: token.expiresAt,
+          deviceId,
           warning: 'No active WhatsApp agents. Use the link directly.',
         },
       });
@@ -62,9 +62,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       success: true,
       message: 'Verification link sent via WhatsApp',
       data: {
-        token,
-        expiresAt,
-        agentId: result.agentId,
+        token: token.token,
+        expiresAt: token.expiresAt,
+        deviceId,
+        agentId: waResult.agentId,
       },
     });
   } catch (error) {
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
+    const deviceId = searchParams.get('deviceId') || undefined;
 
     if (!token) {
       return NextResponse.json(
@@ -88,40 +90,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const record = verificationStore.get(token);
+    const result = verifyToken(token, deviceId);
 
-    if (!record) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid or expired token' },
-        { status: 404 }
-      );
-    }
-
-    if (Date.now() > record.expiresAt) {
-      verificationStore.delete(token);
-      return NextResponse.json(
-        { success: false, error: 'Token expired' },
-        { status: 410 }
-      );
-    }
-
-    if (record.verified) {
+    if (result.success) {
       return NextResponse.json({
         success: true,
-        message: 'Phone already verified',
-        data: { phone: record.phone, verified: true },
+        message: 'Phone verified successfully',
+        data: { phone: result.phone, verified: true },
       });
+    } else {
+      // Check if token exists for better error message
+      const status = getTokenStatus(token);
+      if (!status.exists) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid token' },
+          { status: 404 }
+        );
+      }
+      if (status.expired) {
+        return NextResponse.json(
+          { success: false, error: 'Token expired' },
+          { status: 410 }
+        );
+      }
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 400 }
+      );
     }
-
-    // Mark as verified
-    record.verified = true;
-    verificationStore.set(token, record);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Phone verified successfully',
-      data: { phone: record.phone, verified: true },
-    });
   } catch (error) {
     console.error('[API] Verify token error:', error);
     return NextResponse.json(

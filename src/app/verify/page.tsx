@@ -3,37 +3,53 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+function getDeviceId(): string {
+  let deviceId = localStorage.getItem('drivee_device_id');
+  if (!deviceId) {
+    deviceId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    localStorage.setItem('drivee_device_id', deviceId);
+  }
+  return deviceId;
+}
+
 function VerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
   const [status, setStatus] = useState<'verifying' | 'success' | 'failed' | 'expired'>('verifying');
   const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!token) {
       setStatus('failed');
+      setError('No token provided');
       return;
     }
 
     const verify = async () => {
       try {
-        const res = await fetch(`/api/verify-phone?token=${token}`);
+        const deviceId = getDeviceId();
+        const res = await fetch(`/api/verify-phone?token=${token}&deviceId=${deviceId}`);
         const data = await res.json();
 
         if (data.success) {
           setStatus('success');
           setPhone(data.data.phone);
-          // Store verified phone in localStorage
           localStorage.setItem('drivee_phone_verified', 'true');
           localStorage.setItem('drivee_phone', data.data.phone);
         } else if (res.status === 410) {
           setStatus('expired');
+          setError(data.error);
         } else {
           setStatus('failed');
+          setError(data.error || 'Verification failed');
         }
       } catch {
         setStatus('failed');
+        setError('Network error');
       }
     };
 
@@ -85,7 +101,8 @@ function VerifyContent() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-white mb-2">Link Expired</h2>
-          <p className="text-zinc-400 mb-6">
+          <p className="text-zinc-400 mb-2">{error}</p>
+          <p className="text-zinc-500 text-sm mb-6">
             This verification link has expired. Please request a new one.
           </p>
           <button
@@ -108,8 +125,9 @@ function VerifyContent() {
           </svg>
         </div>
         <h2 className="text-xl font-semibold text-white mb-2">Verification Failed</h2>
-        <p className="text-zinc-400 mb-6">
-          The verification link is invalid. Please request a new one.
+        <p className="text-zinc-400 mb-2">{error}</p>
+        <p className="text-zinc-500 text-sm mb-6">
+          The verification link is invalid or has been used. Please request a new one.
         </p>
         <button
           onClick={() => router.push('/login')}
