@@ -33,31 +33,22 @@ Drifee by Briga is a Next.js 14 progressive web application (PWA) with offline-f
 | **Sync Engine (IndexedDB $\to$ Supabase)** | **COMPLETE** | Implemented in [`src/lib/sync/engine.ts`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/src/lib/sync/engine.ts) and [`src/app/api/sync/route.ts`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/src/app/api/sync/route.ts). Flushes pending offline trips when device reconnects to network. |
 | **Error Tracking & Monitoring (Sentry)** | **COMPLETE** | Production-ready zero-dependency Sentry module in [`src/lib/sentry.ts`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/src/lib/sentry.ts) capturing client and server errors, breadcrumbs, and tags with fallback logging. Verified by unit tests. |
 | **Admin Manual Verification Dashboard** | **COMPLETE** | Interactive manual review controls in [`src/app/admin/page.tsx`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/src/app/admin/page.tsx) with status filtering (All, Pending, Verified, Rejected), photo & telemetry evidence viewer, and [`/api/admin/trips/review`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/src/app/api/admin/trips/review/route.ts) endpoint. |
+| **Automated CI/CD Workflows** | **COMPLETE** | GitHub Actions workflows in [`.github/workflows/`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/.github/workflows/) running `npm test`, typecheck (`npx tsc --noEmit`), Playwright E2E suites, and production builds on push/PR. |
+| **Web Push Notifications & Offline Alerts** | **COMPLETE** | Web Notification manager in [`src/lib/notifications.ts`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/src/lib/notifications.ts) with `notificationclick` navigation in [`public/sw.js`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/public/sw.js) for reward additions and offline queue flush events. |
+| **Performance & Bundle Splitting Optimization** | **COMPLETE** | Webpack `splitChunks` cacheGroups in [`next.config.js`](file:///c:/Users/yabes/Documents/Drive-e%20by%20Briga/next.config.js) separating Leaflet, Supabase, and Dexie into distinct caching layers, with production console stripping. |
 | **Unit & Boundary Testing** | **COMPLETE** | 80 automated tests across 12 test suites in Vitest with 100% pass rate (`npm test`). |
 | **E2E Test Infrastructure** | **COMPLETE** | 4-tier testing harness (Vitest) and Playwright test suite in `e2e/`. |
 | **Production Build** | **COMPLETE** | `npm run build` generates 35 static and dynamic routes with zero TypeScript or linting errors. |
 
 ---
 
-## 3. What's Next (Roadmap for Next Sprints)
+## 3. What's Next (Ongoing Operations & Future Enhancements)
 
-### 📌 P1 — Should Have (Remaining Items)
-
-1. **Automated CI/CD Pipeline**:
-   - Enable GitHub Actions workflow to run `npm test` and `npm run build` on every pull request.
-   - Automate Playwright mobile browser tests on headless Chrome and WebKit.
-
----
-
-### 💡 P2 — Nice to Have (Enhancements)
-
-2. **Web Push Notifications**:
-   - Integrate Web Push API (via Service Worker) to notify drivers when their offline trips are successfully synced and BrigaCoins have been credited to their balance.
-   - Streak milestone notifications (e.g., "🔥 4 trips in a row! 1 more for a +50 bonus!").
-
-3. **Performance & Bundle Splitting Optimization**:
-   - Dynamic import (`next/dynamic`) for heavy map components (`leaflet`, `react-leaflet`) on the driving HUD.
-   - Cache static map tiles using Service Worker Cache Storage API.
+1. **Production Deployment & DNS Cutover**:
+   - Link production domain `drifee.briga.id` in Vercel.
+   - Set up production secrets in Vercel project environment settings.
+2. **Fleet Hardware Integration (CAN Bus / OBD-II)**:
+   - Expand `useTelematics` hook to interface with hardware dongles via Web Bluetooth (BLE) for real-time motor temperatures and instantaneous battery degradation metrics.
 
 ---
 
