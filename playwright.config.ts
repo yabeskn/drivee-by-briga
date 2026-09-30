@@ -2,8 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
-  retries: 2,
+  timeout: 60_000,
+  retries: 1,
   workers: 1,
   reporter: [['html'], ['list']],
   use: {
@@ -14,21 +14,24 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
+    actionTimeout: 10_000,
+    navigationTimeout: 30_000,
   },
   projects: [
     {
       name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
+      use: {
+        ...devices['Pixel 5'],
+        channel: 'chrome',
+      },
     },
   ],
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 });

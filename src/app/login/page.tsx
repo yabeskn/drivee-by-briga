@@ -51,11 +51,11 @@ function LoginContent() {
             <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
               <svg viewBox="0 0 512 512" className="w-5 h-5">
                 <rect width="512" height="512" rx="128" fill="#000000"/>
-                <circle cx="256" cy="256" r="200" fill="#052e16" stroke="#10b981" stroke-width="12"/>
+                <circle cx="256" cy="256" r="200" fill="#052e16" stroke="#10b981" strokeWidth="12"/>
                 <path d="M280 120L190 280H270L230 400L350 240H270L280 120Z" fill="#10b981"/>
-                <path d="M200 150 L200 362 L280 362 Q350 362 350 256 Q350 150 280 150 Z" fill="none" stroke="#ffffff" stroke-width="16" stroke-linejoin="round"/>
+                <path d="M200 150 L200 362 L280 362 Q350 362 350 256 Q350 150 280 150 Z" fill="none" stroke="#ffffff" strokeWidth="16" strokeLinejoin="round"/>
                 <circle cx="380" cy="380" r="24" fill="#F59E0B"/>
-                <text x="380" y="388" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#052e16" text-anchor="middle">$</text>
+                <text x="380" y="388" fontFamily="Arial, sans-serif" fontSize="24" fontWeight="bold" fill="#052e16" textAnchor="middle">$</text>
                 <path d="M130 380 Q150 360 130 340 Q110 360 130 380" fill="#34d399"/>
               </svg>
             </div>

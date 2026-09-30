@@ -7,14 +7,17 @@ interface ActivityLogParams {
 }
 
 export async function logActivity(params: ActivityLogParams): Promise<void> {
+  // Only run in browser — skip during SSR/build
+  if (typeof window === 'undefined') return;
+
   try {
     await fetch('/api/activity/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
-  } catch (error) {
-    console.error('[Activity Logger] Failed to log:', error);
+  } catch {
+    // Silently fail — activity logging is non-critical
   }
 }
 

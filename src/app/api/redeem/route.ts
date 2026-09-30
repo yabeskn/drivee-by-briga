@@ -39,7 +39,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const result = createRedemption(driverId, rewardId);
+    const result = await createRedemption(driverId, rewardId);
 
     if (!result.success) {
       return NextResponse.json(

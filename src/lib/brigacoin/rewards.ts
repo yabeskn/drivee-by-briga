@@ -1,229 +1,97 @@
-import { Reward, Redemption, VehicleCategory, UserType } from '@/types/telematics';
+// ─────────────────────────────────────────────────────────────
+// brigacoin/rewards.ts — Rewards Catalog from Supabase
+//
+// WS3: Migrated from hardcoded array to Supabase `rewards` table.
+// Falls back to in-memory catalog when Supabase not configured.
+// ─────────────────────────────────────────────────────────────
 
-// ── Reward Catalog ──────────────────────────────────────────
+import { supabaseAdmin, isAdminConfigured } from '@/lib/supabase/server';
+import type { Reward, VehicleCategory, UserType } from '@/types/telematics';
 
-export const rewardCatalog: Reward[] = [
-  // Internal Rewards
-  {
-    id: 'int_001',
-    name: 'Premium Analytics',
-    description: 'Advanced trip analytics & reports for 30 days',
-    category: 'internal',
-    cost: 50,
-    stock: 999,
-    image: '/rewards/analytics.png',
-    terms: 'Active for 30 days from redemption',
-    type: 'feature',
-    userType: 'driver',
-    status: 'active',
-  },
-  {
-    id: 'int_002',
-    name: 'Subscription Discount 20%',
-    description: '20% off briga.id subscription',
-    category: 'internal',
-    cost: 100,
-    stock: 999,
-    image: '/rewards/discount.png',
-    terms: 'Valid for 1 subscription cycle',
-    type: 'discount',
-    userType: 'all',
-    status: 'active',
-  },
-  {
-    id: 'int_003',
-    name: 'Profile Boost',
-    description: 'Highlight talent profile for 7 days',
-    category: 'internal',
-    cost: 80,
-    stock: 999,
-    image: '/rewards/boost.png',
-    terms: 'Profile highlighted for 7 days',
-    type: 'feature',
-    userType: 'talent',
-    status: 'active',
-  },
-  {
-    id: 'int_004',
-    name: 'Priority Support',
-    description: 'Fast-track customer service',
-    category: 'internal',
-    cost: 30,
-    stock: 999,
-    image: '/rewards/support.png',
-    terms: 'Valid for 30 days',
-    type: 'service',
-    userType: 'all',
-    status: 'active',
-  },
-  {
-    id: 'int_005',
-    name: 'Training Discount 15%',
-    description: '15% off Briga Academy courses',
-    category: 'internal',
-    cost: 150,
-    stock: 999,
-    image: '/rewards/training.png',
-    terms: 'Valid for 1 course enrollment',
-    type: 'discount',
-    userType: 'all',
-    status: 'active',
-  },
-  {
-    id: 'int_006',
-    name: 'Briga Merchandise',
-    description: 'Briga branded items',
-    category: 'internal',
-    cost: 200,
-    stock: 100,
-    image: '/rewards/merch.png',
-    terms: 'While stocks last',
-    type: 'physical',
-    userType: 'all',
-    status: 'active',
-  },
-
-  // External Rewards - Voucher
-  {
-    id: 'ext_001',
-    name: 'Voucher GoFood Rp 25K',
-    description: 'GoFood voucher worth Rp 25,000',
-    category: 'voucher',
-    cost: 50,
-    stock: 500,
-    image: '/rewards/gofood.png',
-    terms: 'Valid for 30 days',
-    type: 'voucher',
-    userType: 'all',
-    status: 'active',
-  },
-  {
-    id: 'ext_002',
-    name: 'Voucher Tokopedia Rp 50K',
-    description: 'Tokopedia voucher worth Rp 50,000',
-    category: 'voucher',
-    cost: 100,
-    stock: 500,
-    image: '/rewards/tokopedia.png',
-    terms: 'Valid for 30 days',
-    type: 'voucher',
-    userType: 'all',
-    status: 'active',
-  },
-
-  // External Rewards - E-Wallet
-  {
-    id: 'ext_003',
-    name: 'Top-up GoPay Rp 50K',
-    description: 'GoPay top-up worth Rp 50,000',
-    category: 'ewallet',
-    cost: 100,
-    stock: 500,
-    image: '/rewards/gopay.png',
-    terms: 'Auto-credit to GoPay account',
-    type: 'auto_credit',
-    userType: 'all',
-    status: 'active',
-  },
-  {
-    id: 'ext_004',
-    name: 'Top-up e-toll Rp 100K',
-    description: 'Mandiri e-toll top-up worth Rp 100,000',
-    category: 'transport',
-    cost: 200,
-    stock: 500,
-    image: '/rewards/etoll.png',
-    terms: 'Auto-credit to e-toll account',
-    type: 'auto_credit',
-    userType: 'all',
-    status: 'active',
-  },
-
-  // External Rewards - Maintenance
-  {
-    id: 'ext_005',
-    name: 'Servis Mobil Rp 200K',
-    description: 'Car service voucher worth Rp 200,000',
-    category: 'maintenance',
-    cost: 300,
-    stock: 200,
-    image: '/rewards/servis.png',
-    terms: 'Valid at partner workshops',
-    type: 'voucher',
-    userType: 'driver',
-    status: 'active',
-  },
-
-  // External Rewards - Insurance
-  {
-    id: 'ext_006',
-    name: 'Diskon Asuransi 10%',
-    description: '10% discount on vehicle insurance',
-    category: 'insurance',
-    cost: 400,
-    stock: 100,
-    image: '/rewards/insurance.png',
-    terms: 'Valid for 1 policy period',
-    type: 'discount',
-    userType: 'driver',
-    status: 'active',
-  },
-
-  // Carbon Offset
-  {
-    id: 'carbon_001',
-    name: 'Carbon Offset 10 kg CO₂',
-    description: 'Offset 10 kg CO₂ emissions',
-    category: 'carbon',
-    cost: 5,
-    stock: 9999,
-    image: '/rewards/carbon.png',
-    terms: 'Certificate provided',
-    type: 'voucher',
-    userType: 'all',
-    status: 'active',
-  },
-  {
-    id: 'carbon_002',
-    name: 'Carbon Offset 100 kg CO₂',
-    description: 'Offset 100 kg CO₂ emissions',
-    category: 'carbon',
-    cost: 50,
-    stock: 9999,
-    image: '/rewards/carbon.png',
-    terms: 'Certificate provided',
-    type: 'voucher',
-    userType: 'all',
-    status: 'active',
-  },
-  {
-    id: 'carbon_003',
-    name: 'Carbon Offset 1 ton CO₂',
-    description: 'Offset 1 ton CO₂ emissions',
-    category: 'carbon',
-    cost: 500,
-    stock: 9999,
-    image: '/rewards/carbon.png',
-    terms: 'Certificate provided',
-    type: 'voucher',
-    userType: 'all',
-    status: 'active',
-  },
+// ── Fallback catalog (used when Supabase not configured) ────
+const fallbackCatalog: Reward[] = [
+  { id: 'int_001', name: 'Premium Analytics', description: 'Advanced trip analytics for 30 days', category: 'internal', cost: 50, stock: 999, image: '', terms: 'Active 30 days', type: 'feature', userType: 'driver', status: 'active' },
+  { id: 'ext_001', name: 'Voucher GoFood Rp 25K', description: 'GoFood voucher Rp 25,000', category: 'voucher', cost: 50, stock: 500, image: '', terms: 'Valid 30 days', type: 'voucher', userType: 'all', status: 'active' },
+  { id: 'ext_003', name: 'Top-up GoPay Rp 50K', description: 'GoPay top-up Rp 50,000', category: 'ewallet', cost: 100, stock: 500, image: '', terms: 'Auto-credit', type: 'auto_credit', userType: 'all', status: 'active' },
+  { id: 'ext_004', name: 'Top-up e-toll Rp 100K', description: 'e-toll top-up Rp 100,000', category: 'transport', cost: 200, stock: 500, image: '', terms: 'Auto-credit', type: 'auto_credit', userType: 'all', status: 'active' },
+  { id: 'carbon_001', name: 'Carbon Offset 10 kg CO₂', description: 'Offset 10 kg CO₂', category: 'carbon', cost: 5, stock: 9999, image: '', terms: 'Certificate provided', type: 'voucher', userType: 'all', status: 'active' },
 ];
 
-export function getRewards(
+function useSupabase(): boolean {
+  return isAdminConfigured();
+}
+
+// ── Map DB row to Reward type ───────────────────────────────
+function rowToReward(row: Record<string, unknown>): Reward {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    description: (row.description as string) ?? '',
+    category: (row.category as Reward['category']) ?? 'internal',
+    cost: row.cost as number,
+    stock: (row.stock as number) ?? 0,
+    image: (row.image_url as string) ?? '',
+    terms: (row.terms as string) ?? '',
+    type: (row.reward_type as Reward['type']) ?? 'voucher',
+    userType: (row.user_type as UserType) ?? 'all',
+    status: (row.status as Reward['status']) ?? 'active',
+    partnerId: (row.partner_id as string) ?? undefined,
+    vehicleCategory: (row.vehicle_category as VehicleCategory | 'all') ?? undefined,
+  };
+}
+
+// ── Get Rewards ─────────────────────────────────────────────
+
+export async function getRewards(
   userType?: UserType,
-  vehicleCategory?: VehicleCategory
-): Reward[] {
-  return rewardCatalog.filter((r) => {
+  vehicleCategory?: VehicleCategory,
+): Promise<Reward[]> {
+  if (useSupabase()) {
+    let query = supabaseAdmin
+      .from('rewards')
+      .select('*')
+      .eq('status', 'active');
+
+    if (userType) {
+      query = query.or(`user_type.eq.all,user_type.eq.${userType}`);
+    }
+
+    const { data } = await query;
+    let rewards = (data ?? []).map(rowToReward);
+
+    if (vehicleCategory) {
+      rewards = rewards.filter(
+        (r) => !r.vehicleCategory || r.vehicleCategory === 'all' || r.vehicleCategory === vehicleCategory,
+      );
+    }
+
+    return rewards;
+  }
+
+  // Fallback
+  return fallbackCatalog.filter((r) => {
     if (r.status !== 'active') return false;
-    if (r.userType !== 'all' && r.userType !== userType) return false;
-    if (r.vehicleCategory && r.vehicleCategory !== 'all' && r.vehicleCategory !== vehicleCategory)
-      return false;
+    if (userType && r.userType !== 'all' && r.userType !== userType) return false;
+    if (vehicleCategory && r.vehicleCategory && r.vehicleCategory !== 'all' && r.vehicleCategory !== vehicleCategory) return false;
     return true;
   });
 }
 
-export function getRewardById(id: string): Reward | undefined {
-  return rewardCatalog.find((r) => r.id === id);
+// ── Get Reward By ID ────────────────────────────────────────
+
+export async function getRewardById(id: string): Promise<Reward | undefined> {
+  if (useSupabase()) {
+    const { data } = await supabaseAdmin
+      .from('rewards')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    return data ? rowToReward(data) : undefined;
+  }
+
+  return fallbackCatalog.find((r) => r.id === id);
 }
+
+// Re-export fallback for backwards compatibility
+export const rewardCatalog = fallbackCatalog;

@@ -61,7 +61,7 @@ export function InstallBanner() {
           <div className="w-12 h-12 rounded-xl bg-emerald-950 border border-emerald-800 flex items-center justify-center flex-shrink-0">
             <svg viewBox="0 0 512 512" className="w-8 h-8">
               <rect width="512" height="512" rx="128" fill="#000000"/>
-              <circle cx="256" cy="256" r="200" fill="#052e16" stroke="#10b981" stroke-width="12"/>
+              <circle cx="256" cy="256" r="200" fill="#052e16" stroke="#10b981" strokeWidth="12"/>
               <path d="M280 120L190 280H270L230 400L350 240H270L280 120Z" fill="#34d399"/>
             </svg>
           </div>

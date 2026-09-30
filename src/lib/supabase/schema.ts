@@ -265,6 +265,88 @@ export interface Database {
           created_at?: string;
         };
       };
+      rewards: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          category: string;
+          cost: number;
+          stock: number;
+          image_url: string | null;
+          terms: string | null;
+          reward_type: string | null;
+          partner_id: string | null;
+          vehicle_category: string | null;
+          user_type: string;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          category: string;
+          cost: number;
+          stock?: number;
+          image_url?: string | null;
+          terms?: string | null;
+          reward_type?: string | null;
+          partner_id?: string | null;
+          vehicle_category?: string | null;
+          user_type?: string;
+          status?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['rewards']['Insert']>;
+      };
+      redemptions: {
+        Row: {
+          id: string;
+          driver_id: string;
+          reward_id: string;
+          cost: number;
+          status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+          voucher_code: string | null;
+          delivery_method: string;
+          redeemed_at: string | null;
+          expires_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          driver_id: string;
+          reward_id: string;
+          cost: number;
+          status?: string;
+          voucher_code?: string | null;
+          delivery_method?: string;
+          redeemed_at?: string | null;
+          expires_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['redemptions']['Insert']>;
+      };
+      companies: {
+        Row: {
+          id: string;
+          name: string;
+          email: string | null;
+          industry: string | null;
+          contact_phone: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          email?: string | null;
+          industry?: string | null;
+          contact_phone?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['companies']['Insert']>;
+      };
     };
   };
 }
+

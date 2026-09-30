@@ -5,11 +5,11 @@ import { getRewardById } from './rewards';
 // In-memory store (use database in production)
 const redemptionStore = new Map<string, Redemption>();
 
-export function createRedemption(
+export async function createRedemption(
   driverId: string,
   rewardId: string
-): { success: boolean; redemption?: Redemption; error?: string } {
-  const reward = getRewardById(rewardId);
+): Promise<{ success: boolean; redemption?: Redemption; error?: string }> {
+  const reward = await getRewardById(rewardId);
 
   if (!reward) {
     return { success: false, error: 'Reward not found' };
@@ -24,7 +24,7 @@ export function createRedemption(
   }
 
   // Check balance
-  const spendResult = spendBalance(
+  const spendResult = await spendBalance(
     driverId,
     reward.cost,
     'redemption',
