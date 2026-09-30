@@ -1,8 +1,8 @@
-# Drivee by Briga
+# Drifee by Briga
 
 **Smart EV Fleet Telematics PWA** — Real-time telemetry tracking, anti-spoofing verification, eco-driving evaluation, and BrigaCoins incentives platform.
 
-![Drivee Logo](./public/icon.svg)
+![Drifee Logo](./public/icon.svg)
 
 ---
 
@@ -24,7 +24,7 @@
 
 ## Overview
 
-Drivee by Briga is a progressive web application designed for electric vehicle fleet operators and drivers. It enables high-frequency offline-first GPS/CAN telematics recording, anti-tamper photo verification, server-side physics validation, eco-driving scoring, and automated cryptographic reward distribution with BrigaCoins.
+Drifee by Briga is a progressive web application designed for electric vehicle fleet operators and drivers. It enables high-frequency offline-first GPS/CAN telematics recording, anti-tamper photo verification, server-side physics validation, eco-driving scoring, and automated cryptographic reward distribution with BrigaCoins.
 
 ---
 
@@ -163,7 +163,7 @@ Visit [http://localhost:3000](http://localhost:3000) to view the application.
 
 ## Testing & Quality Assurance
 
-Drivee by Briga includes a 4-tier test architecture:
+Drifee by Briga includes a 4-tier test architecture:
 
 - **Tier 1 (Feature Coverage)**: Verification API, token economics, schema definitions, auth protection.
 - **Tier 2 (Boundary & Stress)**: Unrealistic speeds ($> 160\text{ km/h}$), negative energy, missing metadata, streak edge cases.
@@ -214,7 +214,7 @@ The `POST /api/trips/verify` endpoint verifies completed trips:
 2. **Import Project**: Import the repository into the [Vercel Dashboard](https://vercel.com).
 3. **Configure Environment Variables**:
    - Add all variables from `.env.local` to Vercel Project Settings $\rightarrow$ **Environment Variables**.
-   - Ensure `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL` reflect your production domain (e.g., `https://drivee.briga.id`).
+   - Ensure `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL` reflect your production domain (e.g., `https://drifee.briga.id`).
 4. **Build Settings**:
    - Framework Preset: `Next.js`
    - Build Command: `npm run build`
@@ -225,4 +225,4 @@ The `POST /api/trips/verify` endpoint verifies completed trips:
 
 ## License
 
-© 2026 Drivee by Briga. PT Briga Energi Indonesia. All rights reserved.
+© 2026 Drifee by Briga. PT Briga Energi Indonesia. All rights reserved.

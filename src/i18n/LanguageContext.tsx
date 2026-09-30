@@ -18,7 +18,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(defaultLanguage);
 
   useEffect(() => {
-    const saved = localStorage.getItem('drivee-language') as Language | null;
+    const saved = (localStorage.getItem('drifee-language') || localStorage.getItem('drivee-language')) as Language | null;
     if (saved && (saved === 'id' || saved === 'en')) {
       setLanguageState(saved);
     } else {
@@ -29,7 +29,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem('drivee-language', lang);
+    localStorage.setItem('drifee-language', lang);
   }, []);
 
   const t = language === 'id' ? id : en;
