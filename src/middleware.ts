@@ -15,8 +15,11 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 //    (spoofable dari DevTools).
 //  - Verifikasi signature:
 //      1) Asimetris via JWKS proyek Supabase (JWT signing keys),
-//      2) Fallback HS256 memakai SUPABASE_JWT_SECRET (legacy)
-//         atau anon key.
+//      2) Fallback HS256 HANYA memakai SUPABASE_JWT_SECRET.
+//         Anon key sengaja TIDAK dipakai sebagai secret HS256 —
+//         nilainya publik dan bisa dipakai memalsukan token.
+//      3) Fallback terakhir: validasi token ke Auth API Supabase
+//         (/auth/v1/user) — selalu benar di semua konfigurasi.
 //    Fail-closed: token tidak ada / tidak valid → redirect login.
 //  - Parameter `next` disanitasi: hanya path internal relatif,
 //    mencegah open-redirect
@@ -84,11 +87,34 @@ function getRemoteJwks() {
 }
 
 /**
+ * Fallback terakhir: validasi token langsung ke Auth API Supabase.
+ * Selalu benar di semua konfigurasi signing (asimetris maupun HS256
+ * legacy) karena supaya keputusan ada di sisi server Supabase.
+ */
+async function verifyViaAuthApi(token: string): Promise<boolean> {
+	const supabaseUrl = getSupabaseUrl();
+	const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+	if (!supabaseUrl || !anonKey) return false;
+	try {
+		const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+			headers: {
+				Authorization: `Bearer ${token}`,
+				apikey: anonKey,
+			},
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Verifikasi JWT sesi Supabase:
  *  1. Asimetris (RS/ES/EdDSA) via JWKS `NEXT_PUBLIC_SUPABASE_URL/auth/v1/`
  *     — dipakai Supabase ketika "JWT Signing Keys" asimetris aktif.
- *  2. Fallback HS256 memakai `SUPABASE_JWT_SECRET` (legacy) atau
- *     anon key — dipakai project dengan JWT secret bersama.
+ *  2. Fallback HS256 HANYA memakai `SUPABASE_JWT_SECRET` (legacy).
+ *     Anon key TIDAK dipakai sebagai secret — nilainya publik.
+ *  3. Fallback terakhir: Auth API /auth/v1/user.
  * Issuer divalidasi bila URL Supabase diketahui.
  * Mengembalikan claims bila valid, null bila tidak (fail-closed).
  */
@@ -107,14 +133,20 @@ async function verifySessionJwt(token: string): Promise<SessionClaims | null> {
 			}
 		}
 
-		const secret =
-			process.env.SUPABASE_JWT_SECRET ||
-			process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-		if (!secret) return null;
+		const secret = process.env.SUPABASE_JWT_SECRET;
+		if (secret) {
+			const key = new TextEncoder().encode(secret);
+			try {
+				const { payload } = await jwtVerify(token, key, { issuer });
+				return payload as SessionClaims;
+			} catch {
+				// HS256 gagal → coba Auth API
+			}
+		}
 
-		const key = new TextEncoder().encode(secret);
-		const { payload } = await jwtVerify(token, key, { issuer });
-		return payload as SessionClaims;
+		// Verifikasi otoritatif via Auth API (juga memvalidasi bahwa
+			// sesi belum direvoke di server)
+		return (await verifyViaAuthApi(token)) ? { sub: "supabase-auth-api" } : null;
 	} catch {
 		// Signature/exp/issuer tidak valid → sesi ditolak
 		return null;
