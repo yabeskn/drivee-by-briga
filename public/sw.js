@@ -190,15 +190,39 @@ async function syncTripData() {
   });
 }
 
-// ── Push Notifications (for future use) ──────────────────────
+// ── Push Notifications ───────────────────────────────────────
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  const data = event.data.json();
+  try {
+    const data = event.data.json();
+    event.waitUntil(
+      self.registration.showNotification(data.title || 'Drifee by Briga', {
+        body: data.body || '',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        data: data.data || { url: '/' },
+        vibrate: [100, 50, 100],
+      })
+    );
+  } catch (err) {
+    console.warn('[SW] Push parse error:', err);
+  }
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const urlToOpen = event.notification.data?.url || '/';
+
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Briga EV', {
-      body: data.body || '',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(urlToOpen) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
     })
   );
 });

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/db';
+import { notifyOfflineSyncComplete } from '@/lib/notifications';
 
 export interface SyncResult {
   success: boolean;
@@ -12,6 +13,9 @@ export async function syncIndexedDBToSupabase(): Promise<SyncResult> {
   const result: SyncResult = { success: true, synced: 0, failed: 0, errors: [] };
   try {
     await syncOfflineQueue(result);
+    if (result.synced > 0 && typeof window !== 'undefined') {
+      notifyOfflineSyncComplete(result.synced).catch(() => {});
+    }
   } catch (err) {
     result.success = false;
     result.errors.push(String(err));

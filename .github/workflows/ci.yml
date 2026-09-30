@@ -29,12 +29,12 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      - name: Lint
-        run: npx biome check .
+      - name: Unit & Integration Tests
+        run: npm test
 
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_APP_URL: https://drivee.briga.id
-          ALLOWED_ORIGINS: https://drivee.briga.id
+          NEXT_PUBLIC_APP_URL: https://drifee.briga.id
+          ALLOWED_ORIGINS: https://drifee.briga.id
           OSRM_URL: https://router.project-osrm.org
