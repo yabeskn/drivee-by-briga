@@ -14,14 +14,14 @@
 ```
 Error: expect(locator).toBeVisible() failed
 
-Locator: locator('text=Register Vehicle')
+Locator: locator('text=Daftar Kendaraan')
 Expected: visible
 Timeout: 5000ms
 Error: element(s) not found
 
 Call log:
-  - Expect "toBeVisible" locator('text=Register Vehicle') with timeout 5000ms
-  - waiting for locator('text=Register Vehicle')
+  - Expect "toBeVisible" locator('text=Daftar Kendaraan') with timeout 5000ms
+  - waiting for locator('text=Daftar Kendaraan')
 
 ```
 
@@ -40,12 +40,12 @@ Call log:
   3  | test.describe('Start Trip Flow', () => {
   4  |   test('should show vehicle selection or empty state', async ({ page }) => {
   5  |     await page.goto('/go', { timeout: 10000 });
-  6  |     await expect(page.locator('text=No vehicles registered')).toBeVisible({ timeout: 5000 });
+  6  |     await expect(page.locator('text=Tidak ada kendaraan terdaftar')).toBeVisible({ timeout: 5000 });
   7  |   });
   8  | 
   9  |   test('should show register vehicle button when empty', async ({ page }) => {
   10 |     await page.goto('/go', { timeout: 10000 });
-> 11 |     await expect(page.locator('text=Register Vehicle')).toBeVisible({ timeout: 5000 });
+> 11 |     await expect(page.locator('text=Daftar Kendaraan')).toBeVisible({ timeout: 5000 });
      |                                                         ^ Error: expect(locator).toBeVisible() failed
   12 |   });
   13 | });

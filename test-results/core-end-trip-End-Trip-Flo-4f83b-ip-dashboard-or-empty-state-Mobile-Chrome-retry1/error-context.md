@@ -14,14 +14,14 @@
 ```
 Error: expect(locator).toBeVisible() failed
 
-Locator: locator('text=No Trip Data')
+Locator: locator('text=Tidak Ada Data Perjalanan')
 Expected: visible
 Timeout: 5000ms
 Error: element(s) not found
 
 Call log:
-  - Expect "toBeVisible" locator('text=No Trip Data') with timeout 5000ms
-  - waiting for locator('text=No Trip Data')
+  - Expect "toBeVisible" locator('text=Tidak Ada Data Perjalanan') with timeout 5000ms
+  - waiting for locator('text=Tidak Ada Data Perjalanan')
 
 ```
 
@@ -40,8 +40,8 @@ Call log:
   3 | test.describe('End Trip Flow', () => {
   4 |   test('should show end trip dashboard or empty state', async ({ page }) => {
   5 |     await page.goto('/go', { timeout: 10000 });
-> 6 |     await expect(page.locator('text=No Trip Data')).toBeVisible({ timeout: 5000 });
-    |                                                     ^ Error: expect(locator).toBeVisible() failed
+> 6 |     await expect(page.locator('text=Tidak Ada Data Perjalanan')).toBeVisible({ timeout: 5000 });
+    |                                                                  ^ Error: expect(locator).toBeVisible() failed
   7 |   });
   8 | });
   9 | 

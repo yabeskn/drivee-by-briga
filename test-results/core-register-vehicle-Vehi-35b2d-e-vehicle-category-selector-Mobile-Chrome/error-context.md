@@ -14,14 +14,14 @@
 ```
 Error: expect(locator).toBeVisible() failed
 
-Locator: locator('text=Vehicle Category')
+Locator: locator('text=Kategori Kendaraan')
 Expected: visible
 Timeout: 5000ms
 Error: element(s) not found
 
 Call log:
-  - Expect "toBeVisible" locator('text=Vehicle Category') with timeout 5000ms
-  - waiting for locator('text=Vehicle Category')
+  - Expect "toBeVisible" locator('text=Kategori Kendaraan') with timeout 5000ms
+  - waiting for locator('text=Kategori Kendaraan')
 
 ```
 
@@ -63,13 +63,13 @@ Call log:
   3  | test.describe('Vehicle Registration', () => {
   4  |   test('should show vehicle registration form', async ({ page }) => {
   5  |     await page.goto('/register/vehicle', { timeout: 10000 });
-  6  |     await expect(page.locator('text=Vehicle Registration')).toBeVisible({ timeout: 5000 });
+  6  |     await expect(page.locator('text=Pendaftaran Kendaraan')).toBeVisible({ timeout: 5000 });
   7  |   });
   8  | 
   9  |   test('should have vehicle category selector', async ({ page }) => {
   10 |     await page.goto('/register/vehicle', { timeout: 10000 });
-> 11 |     await expect(page.locator('text=Vehicle Category')).toBeVisible({ timeout: 5000 });
-     |                                                         ^ Error: expect(locator).toBeVisible() failed
+> 11 |     await expect(page.locator('text=Kategori Kendaraan')).toBeVisible({ timeout: 5000 });
+     |                                                           ^ Error: expect(locator).toBeVisible() failed
   12 |   });
   13 | });
   14 | 

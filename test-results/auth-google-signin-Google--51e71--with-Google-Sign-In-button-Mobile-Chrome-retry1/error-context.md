@@ -69,7 +69,7 @@ Call log:
   8  | 
   9  |   test('should show phone verification section', async ({ page }) => {
   10 |     await page.goto('/login', { timeout: 10000 });
-  11 |     await expect(page.locator('text=Verify Phone Number')).toBeVisible({ timeout: 5000 });
+  11 |     await expect(page.locator('text=Verifikasi Nomor HP')).toBeVisible({ timeout: 5000 });
   12 |   });
   13 | 
   14 |   test('should have phone input field', async ({ page }) => {

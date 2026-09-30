@@ -70,7 +70,7 @@ Call log:
   10 |     await page.goto('/login', { timeout: 10000 });
 > 11 |     await expect(page.locator('text=Sign in with Google')).toBeVisible({ timeout: 5000 });
      |                                                            ^ Error: expect(locator).toBeVisible() failed
-  12 |     await expect(page.locator('text=Verify Phone Number')).toBeVisible({ timeout: 5000 });
+  12 |     await expect(page.locator('text=Verifikasi Nomor HP')).toBeVisible({ timeout: 5000 });
   13 |   });
   14 | });
   15 | 
