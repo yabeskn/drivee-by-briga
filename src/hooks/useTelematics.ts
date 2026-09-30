@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { db, TelemetryPoint } from '@/lib/db';
+import { registerTelemetryResource } from '@/lib/telemetry-cleanup';
 import type { DrivingStatus } from '@/types/telematics';
 
 // ─────────────────────────────────────────────────────────────
@@ -138,7 +139,7 @@ export function useTelematics({
   const prevPositionRef = useRef<{ lat: number; lng: number; time: number } | null>(null);
   const totalDistanceRef = useRef(0);
   const zeroSpeedStartRef = useRef<number | null>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geoWatchIdRef = useRef<number | null>(null);
   const batchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tripStartRef = useRef<number>(Date.now());
@@ -249,8 +250,11 @@ export function useTelematics({
     latestAccelRef.current = { x, y, z, mag };
   }, []);
 
-  // ── Geolocation one-shot with dynamic re-schedule ─────────
-  const pollGps = useCallback(() => {
+  // ── Geolocation watch — satu watchPosition seumur trip ────
+  // Browser yang menangani re-polling (hemat baterai & bebas
+  // kebocoran setTimeout chain). clearWatch WAJIB dipanggil saat
+  // trip selesai — didaftarkan ke registry global cleanup.
+  const startGeoWatch = useCallback(() => {
     if (!enabled) return;
 
     // Prefer real GPS — fallback to mock if not available
@@ -262,7 +266,7 @@ export function useTelematics({
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    geoWatchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const now = Date.now();
         const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
@@ -396,8 +400,6 @@ export function useTelematics({
           }));
         }
 
-        // ── Schedule next poll ──
-        pollTimerRef.current = setTimeout(pollGps, intervalMs);
       },
       (err) => {
         setState((s) => ({
@@ -405,8 +407,7 @@ export function useTelematics({
           sensorError: `GPS Error (${err.code}): ${err.message}`,
           isGpsLocked: false,
         }));
-        // Retry after current interval
-        pollTimerRef.current = setTimeout(pollGps, currentPollingRef.current);
+        // watchPosition tetap aktif — browser otomatis retry
       },
       {
         enableHighAccuracy: true,
@@ -414,6 +415,16 @@ export function useTelematics({
         maximumAge: 0,
       },
     );
+
+    // Daftarkan navigator.geolocation.clearWatch ke registry global —
+    // dijamin tereksekusi oleh cleanupTelemetry() saat trip selesai
+    // atau aplikasi di-unmount (pencegahan memory leak).
+    registerTelemetryResource(() => {
+      if (geoWatchIdRef.current != null) {
+        navigator.geolocation.clearWatch(geoWatchIdRef.current);
+        geoWatchIdRef.current = null;
+      }
+    });
   }, [enabled, tripId, resolvePollingInterval, classifyDriving]);
 
   // ── Mock sensor fallback (desktop / emulator) ─────────────
@@ -559,8 +570,8 @@ export function useTelematics({
     const hasMotion = 'DeviceMotionEvent' in window;
 
     if (hasGeolocation) {
-      // ── 3a. Start GPS polling chain ──
-      pollGps();
+      // ── 3a. Start GPS watch (clearWatch terdaftar di registry) ──
+      startGeoWatch();
 
       // ── 3b. Start DeviceMotion listener ──
       if (hasMotion) {
@@ -585,11 +596,32 @@ export function useTelematics({
     // ── 5. Batch-write timer → IndexedDB every 30s ──
     batchTimerRef.current = setInterval(flushBuffer, BATCH_WRITE_INTERVAL_MS);
 
+    // ── 6. Anti memory-leak: flush + clearWatch saat app di-background ──
+    // pagehide/fire/unload adalah satu-satunya event yang RELIABLE di PWA
+    // mobile (visibilitychange tidak cukup untuk iOS Safari). Flush buffer
+    // agar data tidak hilang, lalu clearWatch — watch akan di-restart
+    // oleh effect ini saat aplikasi kembali aktif (re-mount).
+    const handlePageHide = () => {
+      flushBuffer();
+      if (geoWatchIdRef.current != null) {
+        navigator.geolocation.clearWatch(geoWatchIdRef.current);
+        geoWatchIdRef.current = null;
+      }
+    };
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handlePageHide);
+    registerTelemetryResource(() => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
+    });
+
     // ══ Cleanup ══
     return () => {
-      // Stop GPS polling
-      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-      pollTimerRef.current = null;
+      // Stop GPS watch — navigator.geolocation.clearWatch WAJIB dieksekusi
+      if (geoWatchIdRef.current != null) {
+        navigator.geolocation.clearWatch(geoWatchIdRef.current);
+        geoWatchIdRef.current = null;
+      }
 
       // Stop batch-write timer
       if (batchTimerRef.current) clearInterval(batchTimerRef.current);
@@ -611,6 +643,10 @@ export function useTelematics({
 
       // Remove visibility change listener
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+      // Remove pagehide listeners
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
 
       // Final flush — write remaining buffer to DB
       flushBuffer();

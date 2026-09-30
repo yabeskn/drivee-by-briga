@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Zap,
   Flame,
@@ -16,22 +16,35 @@ import {
   WifiOff,
   Moon,
   Sun,
+  UserRound,
+  Navigation,
 } from 'lucide-react';
 import { useTelematics, TelematicsState } from '@/hooks/useTelematics';
-import { EcoProfile } from '@/types/telematics';
+import { useSilentWatchdog } from '@/hooks/useSilentWatchdog';
+import { LiveProofCapture } from '@/components/LiveProofCapture';
+import { cleanupTelemetry } from '@/lib/telemetry-cleanup';
+import { EcoProfile, type TripPhase, type PhotoEvidence, type TripSecurityContext } from '@/types/telematics';
 import { formatTime } from '@/lib/utils';
-import { isOnline } from '@/lib/offline-sync';
 
 interface ActiveDrivingHUDProps {
-  onEndTrip: (telemetry: TelematicsState) => void;
+  onEndTrip: (telemetry: TelematicsState, security: TripSecurityContext) => void;
   tripId?: string;
   useLiveSensors?: boolean;
+  /** Fase awal dari state machine (default DISPATCHED — langsung OTW jemput) */
+  initialPhase?: TripPhase;
+  /** Notifikasi perubahan fase ke state machine di parent */
+  onPhaseChange?: (phase: TripPhase) => void;
+  /** Mode simulasi desktop/e2e: watchdog tidak menandai anomali */
+  simulateMode?: boolean;
 }
 
 export function ActiveDrivingHUD({
   onEndTrip,
   tripId = `trk_${Date.now()}`,
   useLiveSensors = true,
+  initialPhase = 'DISPATCHED',
+  onPhaseChange,
+  simulateMode = false,
 }: ActiveDrivingHUDProps) {
   const telemetry = useTelematics({
     tripId,
@@ -39,6 +52,10 @@ export function ActiveDrivingHUD({
     useMockFallback: true,
   });
 
+  const [phase, setPhase] = useState<TripPhase>(initialPhase);
+  const [proofEvidence, setProofEvidence] = useState<PhotoEvidence | null>(null);
+  // Snapshot jarak saat penumpang naik = deadhead miles (Scope 3 absolut)
+  const deadheadDistanceRef = useRef<number | null>(null);
   const [ultraMinimalOled, setUltraMinimalOled] = useState(false);
   const [showSensorPanel, setShowSensorPanel] = useState(true);
   const [activeProfile, setActiveProfile] = useState<EcoProfile>('HIGHWAY_NORMAL');
@@ -54,6 +71,34 @@ export function ActiveDrivingHUD({
       window.removeEventListener('offline', updateOnlineStatus);
     };
   }, []);
+
+  // ══ Invisible Security: watchdog diam-diam (2 menit pertama) ══
+  // Modal LiveProofCapture HANYA dirender saat ANOMALY_DETECTED.
+  const handleAnomaly = useCallback(() => {
+    // Tidak perlu setState tambahan — status watchdog sudah memicu render modal
+  }, []);
+
+  const watchdog = useSilentWatchdog({
+    enabled: useLiveSensors && (phase === 'DISPATCHED' || phase === 'PASSENGER_PICKED_UP'),
+    gpsSpeedKmh: telemetry.speedKmh > 0 ? telemetry.speedKmh : null,
+    simulateMode,
+    onAnomaly: handleAnomaly,
+  });
+
+  const isProofLocked = watchdog.status === 'ANOMALY_DETECTED' && !proofEvidence;
+
+  /** Freezer penuh: trip hanya bisa dilanjutkan setelah proof tervalidasi */
+  const handleProofValidated = useCallback((evidence: PhotoEvidence) => {
+    setProofEvidence(evidence);
+  }, []);
+
+  /** Kumpulkan konteks keamanan untuk payload verifikasi */
+  const buildSecurityContext = useCallback((): TripSecurityContext => ({
+    watchdogFlagged: watchdog.status === 'ANOMALY_DETECTED',
+    watchdogReason: watchdog.reason,
+    deadheadDistanceKm: deadheadDistanceRef.current ?? 0,
+    proofEvidence,
+  }), [watchdog.status, watchdog.reason, proofEvidence]);
 
   const toggleProfile = () => {
     setActiveProfile((p) =>
@@ -77,6 +122,30 @@ export function ActiveDrivingHUD({
     : telemetry.pollingTier === 'MEDIUM'
     ? '5s'
     : '15s';
+
+  const phaseLabel: Record<TripPhase, string> = {
+    IDLE: 'Idle',
+    DISPATCHED: 'OTW Jemput (Deadhead)',
+    PASSENGER_PICKED_UP: 'Penumpang di',
+    COMPLETED: 'Selesai',
+  };
+
+  const watchdogLabel: Record<string, string> = {
+    IDLE: 'OFF',
+    RUNNING: `AKTIF ${Math.ceil((watchdog.remainingMs ?? 0) / 1000)}s`,
+    CLEAN: 'BERSIH',
+    ANOMALY_DETECTED: 'ANOMALI',
+  };
+
+  // ══ FREEZE: modal membekukan seluruh aplikasi ══
+  if (isProofLocked) {
+    return (
+      <LiveProofCapture
+        onValidated={handleProofValidated}
+        reason={watchdog.reason}
+      />
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col justify-between p-4 max-w-md mx-auto w-full bg-black text-white select-none overflow-hidden relative">
@@ -160,6 +229,27 @@ export function ActiveDrivingHUD({
               </span>
               <span className="text-zinc-500 font-medium">{pollingLabel}</span>
             </div>
+          </div>
+        )}
+
+        {!ultraMinimalOled && (
+          <div className="flex items-center justify-between text-[11px] font-mono border-b border-zinc-900 pb-2">
+            <span className="flex items-center gap-1.5 text-cyan-400">
+              <Navigation className="w-3 h-3" />
+              {phaseLabel[phase]}
+            </span>
+            <span
+              className={`flex items-center gap-1 text-[10px] ${
+                watchdog.status === 'ANOMALY_DETECTED'
+                  ? 'text-red-400'
+                  : watchdog.status === 'CLEAN'
+                  ? 'text-emerald-400'
+                  : 'text-zinc-400'
+              }`}
+            >
+              <ShieldAlert className="w-3 h-3" />
+              WATCHDOG {watchdogLabel[watchdog.status]}
+            </span>
           </div>
         )}
       </div>
@@ -312,8 +402,26 @@ export function ActiveDrivingHUD({
         )}
 
         <div className="pt-1">
+          {phase === 'DISPATCHED' && (
+            <button
+              onClick={() => {
+                // Deadhead berakhir di sini — catat jarak kosong terkumpul
+                deadheadDistanceRef.current = telemetry.tripDistanceKm;
+                setPhase('PASSENGER_PICKED_UP');
+                onPhaseChange?.('PASSENGER_PICKED_UP');
+              }}
+              className="w-full py-3 px-4 mb-2 bg-cyan-600/90 hover:bg-cyan-500 text-white font-semibold rounded-xl flex items-center justify-center space-x-2 transition-colors"
+            >
+              <UserRound className="w-5 h-5" />
+              <span>Penumpang Sudah Naik</span>
+            </button>
+          )}
           <button
-            onClick={() => onEndTrip(telemetry)}
+            onClick={() => {
+              // COMPLETED: hentikan SEMUA resource telematik (anti memory leak)
+              cleanupTelemetry();
+              onEndTrip(telemetry, buildSecurityContext());
+            }}
             className="w-full py-3.5 px-4 bg-red-600/90 hover:bg-red-500 text-white font-semibold rounded-xl flex items-center justify-center space-x-2 transition-colors"
           >
             <StopCircle className="w-5 h-5" />

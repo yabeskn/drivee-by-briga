@@ -47,7 +47,7 @@ export interface TripHashPayload {
  * Serialisasi objek ke JSON dengan key yang di-sort secara rekursif.
  * Ini memastikan hash deterministik terlepas dari urutan properti.
  */
-function canonicalJSON(obj: unknown): string {
+export function canonicalJSON(obj: unknown): string {
   if (obj === null || obj === undefined) return 'null';
   if (typeof obj === 'number') return Number.isFinite(obj) ? String(obj) : 'null';
   if (typeof obj === 'string') return JSON.stringify(obj);

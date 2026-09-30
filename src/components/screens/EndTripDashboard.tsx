@@ -19,7 +19,7 @@ import {
   Camera,
 } from 'lucide-react';
 
-import { TripRecord, PhotoEvidence } from '@/types/telematics';
+import { TripRecord, PhotoEvidence, TripSecurityContext } from '@/types/telematics';
 import { TelematicsState } from '@/hooks/useTelematics';
 import { submitAndVerifyTrip, type TripSubmissionResult } from '@/lib/trip-submitter';
 import { EcoScoreBreakdown } from '@/lib/eco-score';
@@ -30,6 +30,8 @@ interface EndTripDashboardProps {
   finalTelemetry?: TelematicsState | null;
   onStartNewTrip: () => void;
   startPhotoEvidence?: PhotoEvidence;
+  /** Konteks Invisible Security + Scope 3 dari HUD */
+  securityContext?: TripSecurityContext | null;
 }
 
 export function EndTripDashboard({
@@ -37,6 +39,7 @@ export function EndTripDashboard({
   finalTelemetry,
   onStartNewTrip,
   startPhotoEvidence,
+  securityContext,
 }: EndTripDashboardProps) {
   // If no trip data, show empty state
   if (!tripData) {
@@ -60,12 +63,7 @@ export function EndTripDashboard({
   const [submissionResult, setSubmissionResult] = useState<TripSubmissionResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
-  const [endPhotoEvidence, setEndPhotoEvidence] = useState<PhotoEvidence>({
-    odometerPhoto: null,
-    batteryPhoto: null,
-    capturedAt: 0,
-    gpsLocation: null,
-  });
+  const [endPhotoEvidence, setEndPhotoEvidence] = useState<PhotoEvidence | null>(null);
 
   const [finalSoc, setFinalSoc] = useState(tripData.end_battery_soc);
   const [finalOdo, setFinalOdo] = useState(tripData.end_odometer_km);
@@ -78,12 +76,13 @@ export function EndTripDashboard({
   const calculatedSocUsed = Math.max(0, startSoc - finalSoc);
   const calculatedKwhUsed = Number(((calculatedSocUsed / 100) * batteryCapKwh).toFixed(2));
 
+  /**
+   * UX Anti-Friction: submit TIDAK menunggu foto. Foto bukti akhir
+   * bersifat opsional — dikirim jika ada, null jika tidak. Server
+   * memvalidasi foto hanya ketika tersedia.
+   */
   const handleSubmit = async () => {
     if (!finalTelemetry) return;
-    if (!endPhotoEvidence.odometerPhoto || !endPhotoEvidence.batteryPhoto) {
-      setShowPhotoCapture(true);
-      return;
-    }
 
     setIsSubmitting(true);
 
@@ -101,13 +100,12 @@ export function EndTripDashboard({
         batteryCapacityKwh: batteryCapKwh,
         driverCurrentStreak: 0,
         telemetryState: finalTelemetry,
-        startPhotoEvidence: startPhotoEvidence || {
-          odometerPhoto: null,
-          batteryPhoto: null,
-          capturedAt: 0,
-          gpsLocation: null,
-        },
+        startPhotoEvidence: startPhotoEvidence || null,
         endPhotoEvidence,
+        deadheadDistanceKm: securityContext?.deadheadDistanceKm,
+        tripPhaseTimeline: tripData.trip_phase_timeline ?? [],
+        watchdogFlagged: securityContext?.watchdogFlagged,
+        watchdogAnomalyReason: securityContext?.watchdogReason,
       });
 
       setSubmissionResult(result);
@@ -172,7 +170,7 @@ export function EndTripDashboard({
   };
 
   const isSynced = submissionResult?.verificationStatus === 'VERIFIED';
-  const hasEndPhoto = endPhotoEvidence.odometerPhoto && endPhotoEvidence.batteryPhoto;
+  const hasEndPhoto = Boolean(endPhotoEvidence?.odometerPhoto && endPhotoEvidence?.batteryPhoto);
 
   if (showPhotoCapture) {
     return (
@@ -432,12 +430,12 @@ export function EndTripDashboard({
         <div className={`flex items-center justify-between p-3 rounded-xl border ${
           hasEndPhoto
             ? 'bg-emerald-950/30 border-emerald-800/40'
-            : 'bg-amber-950/20 border-amber-800/40'
+            : 'bg-zinc-900/60 border-zinc-800/60'
         }`}>
           <div className="flex items-center gap-2">
-            <Camera className={`w-4 h-4 ${hasEndPhoto ? 'text-emerald-400' : 'text-amber-400'}`} />
-            <span className={`text-xs font-medium ${hasEndPhoto ? 'text-emerald-300' : 'text-amber-300'}`}>
-              {hasEndPhoto ? 'Bukti foto: OK' : 'Bukti foto: Belum'}
+            <Camera className={`w-4 h-4 ${hasEndPhoto ? 'text-emerald-400' : 'text-zinc-400'}`} />
+            <span className={`text-xs font-medium ${hasEndPhoto ? 'text-emerald-300' : 'text-zinc-400'}`}>
+              {hasEndPhoto ? 'Bukti foto akhir: OK' : 'Bukti foto akhir: Opsional'}
             </span>
           </div>
           {hasEndPhoto ? (
@@ -445,22 +443,20 @@ export function EndTripDashboard({
           ) : (
             <button
               onClick={() => setShowPhotoCapture(true)}
-              className="text-xs text-amber-400 hover:text-amber-300 font-medium"
+              className="text-xs text-zinc-300 hover:text-emerald-300 font-medium"
             >
-              Ambil
+              Ambil (opsional)
             </button>
           )}
         </div>
 
         <button
           onClick={handleSubmit}
-          disabled={isSubmitting || !hasEndPhoto}
+          disabled={isSubmitting}
           className={`w-full py-3 px-4 rounded-lg font-semibold flex items-center justify-center space-x-2 text-xs transition-colors ${
             isSubmitting
               ? 'bg-zinc-800 text-zinc-400'
-              : hasEndPhoto
-              ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
-              : 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
+              : 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
           }`}
         >
           {isSubmitting ? (
@@ -468,15 +464,10 @@ export function EndTripDashboard({
               <Loader2 className="w-4 h-4 animate-spin" />
               <span>Verifying...</span>
             </>
-          ) : hasEndPhoto ? (
+          ) : (
             <>
               <ShieldCheck className="w-4 h-4" />
               <span>Submit & Verify</span>
-            </>
-          ) : (
-            <>
-              <Camera className="w-4 h-4" />
-              <span>Ambil Foto Dahulu</span>
             </>
           )}
         </button>

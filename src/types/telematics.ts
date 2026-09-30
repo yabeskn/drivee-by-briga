@@ -2,6 +2,57 @@ export type DrivingStatus = 'smooth' | 'harsh_accel' | 'sudden_brake' | 'idle';
 
 export type EcoProfile = 'HIGHWAY_NORMAL' | 'URBAN_RUSH_HOUR';
 
+// ── Trip Lifecycle (Scope 3 State Machine) ──────────────────
+
+/**
+ * State machine alur trip:
+ *   IDLE → DISPATCHED → PASSENGER_PICKED_UP → COMPLETED
+ *
+ * Aturan keras: perekaman telematik (odometer, GPS, estimasi daya
+ * baterai) WAJIB dimulai tepat pada transisi IDLE → DISPATCHED,
+ * karena deadhead miles (jarak kosong menuju titik jemput) adalah
+ * bagian integral dari emisi Scope 3.
+ */
+export type TripPhase =
+  | 'IDLE'
+  | 'DISPATCHED'
+  | 'PASSENGER_PICKED_UP'
+  | 'COMPLETED';
+
+/**
+ * Status Invisible Security watchdog.
+ *   IDLE             — belum aktif
+ *   RUNNING          — membaca sensor diam-diam (2 menit pertama)
+ *   CLEAN            — window selesai, tidak ada anomali
+ *   ANOMALY_DETECTED — indikasi Fake GPS / sensor tidak konsisten
+ */
+export type WatchdogStatus =
+  | 'IDLE'
+  | 'RUNNING'
+  | 'CLEAN'
+  | 'ANOMALY_DETECTED';
+
+export interface TripPhaseTransition {
+  from: TripPhase;
+  to: TripPhase;
+  at: string; // ISO 8601
+}
+
+/**
+ * Konteks Invisible Security & Scope 3 yang dikirim dari HUD
+ * saat trip berakhir — wajib masuk payload verifikasi.
+ */
+export interface TripSecurityContext {
+  /** Watchdog mendeteksi anomali (Fake GPS)? */
+  watchdogFlagged: boolean;
+  /** Alasan anomali (jika ada) */
+  watchdogReason: string | null;
+  /** Jarak deadhead (kosong) tercatat saat penumpang naik (km) */
+  deadheadDistanceKm: number;
+  /** Bukti foto live dari LiveProofCapture (jika pernah dipicu) */
+  proofEvidence: PhotoEvidence | null;
+}
+
 export type VehicleCategory = 'standard' | 'professional' | 'premium' | 'premium_plus';
 
 export type TripType = 'solo' | 'shared';
@@ -97,6 +148,16 @@ export interface TripRecord {
   trip_hash: string;
   verification_status: 'VERIFIED' | 'PENDING' | 'REJECTED';
   esg_co2_avoided_kg: number;
+  // ── Scope 3 breakdown (deadhead absolut) ──
+  /** Jarak kosong (deadhead) menuju titik jemput — bagian dari total */
+  deadhead_distance_km?: number;
+  /** Jarak dengan penumpang = total − deadhead */
+  revenue_distance_km?: number;
+  /** Timeline transisi state machine */
+  trip_phase_timeline?: TripPhaseTransition[];
+  /** Invisible Security: watchdog menandai anomali? */
+  watchdog_flagged?: boolean;
+  watchdog_anomaly_reason?: string | null;
 }
 
 export interface PhotoEvidence {

@@ -39,9 +39,22 @@ export interface TripSubmissionInput {
   driverCurrentStreak: number;
   /** Final telemetry state from useTelematics hook */
   telemetryState: TelematicsState;
-  /** Anti-spoofing photo evidence */
-  startPhotoEvidence: PhotoEvidence;
-  endPhotoEvidence: PhotoEvidence;
+  /**
+   * Anti-spoofing photo evidence — OPSIONAL.
+   * UX anti-friction: validasi manual hanya dipicu oleh watchdog
+   * (ANOMALY_DETECTED via LiveProofCapture), bukan wajib di awal/akhir trip.
+   */
+  startPhotoEvidence: PhotoEvidence | null;
+  endPhotoEvidence: PhotoEvidence | null;
+  /**
+   * Scope 3 absolut: rincian jarak deadhead (kosong menuju jemput)
+   * vs jarak revenue. Deadhead WAJIB masuk payload — wajib dihitung
+   * sejak transisi DISPATCHED.
+   */
+  deadheadDistanceKm?: number;
+  tripPhaseTimeline?: Array<{ from: string; to: string; at: string }>;
+  watchdogFlagged?: boolean;
+  watchdogAnomalyReason?: string | null;
 }
 
 export interface TripSubmissionResult {
@@ -76,6 +89,10 @@ export async function submitAndVerifyTrip(
   const distanceKm = Math.max(0, Number((endOdometerKm - startOdometerKm).toFixed(1)));
   const socUsed = Math.max(0, startBatterySoc - endBatterySoc);
   const energyUsedKwh = Number(((socUsed / 100) * batteryCapacityKwh).toFixed(2));
+
+  // ── 1b. Scope 3 absolut — deadhead miles adalah bagian integral ──
+  const deadheadDistanceKm = Math.min(input.deadheadDistanceKm ?? 0, distanceKm);
+  const revenueDistanceKm = Number((distanceKm - deadheadDistanceKm).toFixed(1));
 
   // ── 2. Build telemetry summary ──
   const telemetrySummary: TripTelemetrySummary = {
@@ -183,17 +200,27 @@ export async function submitAndVerifyTrip(
         telemetry_summary: telemetrySummary,
         eco_score: ecoScore.score,
         eco_grade: ecoScore.grade,
+        score_breakdown: ecoScore.breakdown,
         tokens_earned: tokenReward.totalReward,
         esg_co2_avoided_kg: co2AvoidedKg,
+        client_nonce: hashResult.payload.client_nonce,
+        hashed_at: hashResult.payload.hashed_at,
+        driver_current_streak: driverCurrentStreak,
         trip_hash: hashResult.hash,
         gps_points: gpsPoints,
+        // Scope 3 breakdown — deadhead wajib terekam di server
+        deadhead_distance_km: deadheadDistanceKm,
+        revenue_distance_km: revenueDistanceKm,
+        trip_phase_timeline: input.tripPhaseTimeline ?? [],
+        watchdog_flagged: input.watchdogFlagged ?? false,
+        watchdog_anomaly_reason: input.watchdogAnomalyReason ?? null,
         photo_evidence: {
-          start_odometer: startPhotoEvidence.odometerPhoto,
-          start_battery: startPhotoEvidence.batteryPhoto,
-          end_odometer: endPhotoEvidence.odometerPhoto,
-          end_battery: endPhotoEvidence.batteryPhoto,
-          captured_at: startPhotoEvidence.capturedAt,
-          gps_location: startPhotoEvidence.gpsLocation,
+          start_odometer: startPhotoEvidence?.odometerPhoto ?? null,
+          start_battery: startPhotoEvidence?.batteryPhoto ?? null,
+          end_odometer: endPhotoEvidence?.odometerPhoto ?? null,
+          end_battery: endPhotoEvidence?.batteryPhoto ?? null,
+          captured_at: startPhotoEvidence?.capturedAt ?? endPhotoEvidence?.capturedAt ?? 0,
+          gps_location: startPhotoEvidence?.gpsLocation ?? endPhotoEvidence?.gpsLocation ?? null,
         },
       }),
     });
@@ -207,7 +234,11 @@ export async function submitAndVerifyTrip(
       tokens_earned?: number;
     };
 
-    verificationStatus = resp.verification_status === 'VERIFIED' ? 'VERIFIED' : 'REJECTED';
+    if (!res.ok) {
+      verificationStatus = 'REJECTED';
+    } else {
+      verificationStatus = resp.verification_status === 'VERIFIED' ? 'VERIFIED' : 'REJECTED';
+    }
     matchedRoute = resp.matched_route ?? null;
 
     // Override tokens_earned from server response if available
@@ -233,10 +264,28 @@ export async function submitAndVerifyTrip(
         telemetry_summary: telemetrySummary,
         eco_score: ecoScore.score,
         eco_grade: ecoScore.grade,
+        score_breakdown: ecoScore.breakdown,
         tokens_earned: tokenReward.totalReward,
         esg_co2_avoided_kg: co2AvoidedKg,
+        client_nonce: hashResult.payload.client_nonce,
+        hashed_at: hashResult.payload.hashed_at,
+        driver_current_streak: driverCurrentStreak,
         trip_hash: hashResult.hash,
         gps_points: gpsPoints,
+        // Scope 3 breakdown — ikut masuk antrian offline
+        deadhead_distance_km: deadheadDistanceKm,
+        revenue_distance_km: revenueDistanceKm,
+        trip_phase_timeline: input.tripPhaseTimeline ?? [],
+        watchdog_flagged: input.watchdogFlagged ?? false,
+        watchdog_anomaly_reason: input.watchdogAnomalyReason ?? null,
+        photo_evidence: {
+          start_odometer: startPhotoEvidence?.odometerPhoto ?? null,
+          start_battery: startPhotoEvidence?.batteryPhoto ?? null,
+          end_odometer: endPhotoEvidence?.odometerPhoto ?? null,
+          end_battery: endPhotoEvidence?.batteryPhoto ?? null,
+          captured_at: startPhotoEvidence?.capturedAt ?? endPhotoEvidence?.capturedAt ?? 0,
+          gps_location: startPhotoEvidence?.gpsLocation ?? endPhotoEvidence?.gpsLocation ?? null,
+        },
       };
 
       try {
