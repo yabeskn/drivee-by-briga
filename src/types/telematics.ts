@@ -189,7 +189,7 @@ export interface BrigaCoinTransaction {
   type: 'earn' | 'spend' | 'expire' | 'adjust';
   amount: number;
   balance: number;
-  source: 'trip' | 'bonus' | 'redemption' | 'referral' | 'adjustment' | 'carbon_offset';
+  source: 'trip' | 'bonus' | 'redemption' | 'referral' | 'adjustment' | 'carbon_offset' | 'corporate_allowance' | 'corporate_voucher' | 'trip_discount';
   referenceId?: string;
   description: string;
   actor?: 'drifee' | 'briga' | 'system' | 'admin';
@@ -266,6 +266,43 @@ export interface CarbonOffset {
   cost: number;
   brcEarned: number;
   certificateUrl?: string;
+  createdAt: Date;
+}
+
+// ── Corporate Green Commute & ESG Perks Types ───────────────
+
+export interface CorporateProfile {
+  id: string;
+  companyName: string;
+  domain?: string;
+  brigaCoinPool: number;
+  minPerEmployee: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CorporateAllowance {
+  id: string;
+  corporateId: string;
+  employeeEmail: string;
+  amountBrc: number;
+  status: 'allocated' | 'claimed' | 'expired' | 'revoked';
+  voucherCode?: string;
+  claimedByUserId?: string;
+  claimedAt?: Date;
+  expiresAt?: Date;
+  createdAt: Date;
+}
+
+export interface CorporateEmissionLog {
+  id: string;
+  corporateId: string;
+  tripId?: string;
+  employeeEmail: string;
+  distanceKm: number;
+  co2SavedKg: number;
+  brcSpent: number;
+  vehicleType: string;
   createdAt: Date;
 }
 

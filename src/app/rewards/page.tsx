@@ -121,7 +121,7 @@ export default function RewardsPage() {
         </div>
 
         {/* Balance Card */}
-        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 mb-8">
+        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-zinc-400">BrigaCoin Balance</p>
@@ -134,6 +134,57 @@ export default function RewardsPage() {
               </svg>
             </div>
           </div>
+        </div>
+
+        {/* Corporate Commute Voucher Claim Card */}
+        <div className="bg-gradient-to-r from-emerald-950/40 via-zinc-950 to-zinc-950 border border-emerald-800/40 rounded-xl p-5 mb-8">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">🌿</span>
+            <h3 className="text-sm font-semibold text-white">Klaim Subsidi Komuter Hijau (Corporate ESG Perk)</h3>
+          </div>
+          <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
+            Dapatkan saldo BrigaCoin dari kantor Anda untuk potongan ongkos perjalanan armada <strong>Mobil Listrik (EV)</strong> Drifee (1 BRC = Rp 5.000).
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              id="corporateVoucherInput"
+              placeholder="Masukkan kode voucher (contoh: CORP-DEMO-XYZ)"
+              className="flex-1 px-3.5 py-2.5 bg-zinc-900 border border-zinc-700/80 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 font-mono uppercase"
+            />
+            <button
+              onClick={async () => {
+                const input = document.getElementById('corporateVoucherInput') as HTMLInputElement;
+                const code = input?.value.trim();
+                const driverId = localStorage.getItem('drifee_driver_id') || localStorage.getItem('drivee_driver_id') || 'drv_default';
+                const userEmail = localStorage.getItem('drivee_user_email') || 'karyawan@demo.com';
+
+                try {
+                  const res = await fetch('/api/corporate/claim', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: driverId, email: userEmail, voucherCode: code || undefined }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    setMessage({ type: 'success', text: data.data.message });
+                    fetchBalance();
+                    if (input) input.value = '';
+                  } else {
+                    setMessage({ type: 'error', text: data.error || 'Gagal mengklaim kuota' });
+                  }
+                } catch {
+                  setMessage({ type: 'error', text: 'Gagal terhubung ke server' });
+                }
+              }}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors whitespace-nowrap"
+            >
+              Klaim Subsidi
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-500 mt-2">
+            ℹ️ Domain kantor terverifikasi juga akan mengklaim kuota bulanan secara otomatis saat login.
+          </p>
         </div>
 
         {/* Message */}
