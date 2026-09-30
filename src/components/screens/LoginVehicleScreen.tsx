@@ -17,7 +17,6 @@ import {
   Camera,
   Check,
 } from 'lucide-react';
-import { MOCK_DRIVER, MOCK_VEHICLES } from '@/lib/mock-data';
 import { EVVehicle, PhotoEvidence } from '@/types/telematics';
 import { CameraCapture } from '@/components/CameraCapture';
 
@@ -33,14 +32,15 @@ interface LoginVehicleScreenProps {
 
 export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
   const [step, setStep] = useState<'auth' | 'vehicle' | 'ready' | 'photo'>('auth');
-  const [phone, setPhone] = useState('081298765432');
-  const [pin, setPin] = useState('889900');
+  const [phone, setPhone] = useState('');
+  const [pin, setPin] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle>(MOCK_VEHICLES[0]);
+  const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle | null>(null);
+  const [vehicles, setVehicles] = useState<EVVehicle[]>([]);
 
-  const [initialSoc, setInitialSoc] = useState<number>(MOCK_VEHICLES[0].currentSoC);
-  const [initialOdo, setInitialOdo] = useState<number>(14250.0);
-  const [corridor, setCorridor] = useState('Cikarang Dry Port ➔ Bandara Soetta T3');
+  const [initialSoc, setInitialSoc] = useState<number>(0);
+  const [initialOdo, setInitialOdo] = useState<number>(0);
+  const [corridor, setCorridor] = useState('');
 
   const [photoEvidence, setPhotoEvidence] = useState<PhotoEvidence>({
     odometerPhoto: null,
@@ -63,6 +63,7 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
   };
 
   const handleConfirmStart = () => {
+    if (!selectedVehicle) return;
     setStep('photo');
   };
 
@@ -72,6 +73,7 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
     capturedAt: number;
     gpsLocation: { lat: number; lng: number } | null;
   }) => {
+    if (!selectedVehicle) return;
     setPhotoEvidence(evidence);
     onStartTrip({
       vehicle: selectedVehicle,
@@ -125,7 +127,7 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
           <div className="flex items-center space-x-2 bg-zinc-900/80 px-2.5 py-1 rounded-full border border-zinc-800">
             <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
             <span className="text-[11px] font-medium text-zinc-300 truncate max-w-[90px]">
-              {MOCK_DRIVER.name.split(' ')[0]}
+              {localStorage.getItem('drivee_name') || 'Driver'}
             </span>
           </div>
         )}
@@ -160,8 +162,8 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
                 </span>
               </div>
               <div className="flex items-center justify-between text-[11px] text-zinc-300">
-                <span>Driver: <strong className="text-white">{MOCK_DRIVER.name}</strong></span>
-                <span className="text-emerald-400 font-mono">{MOCK_DRIVER.totalBrigaCoins} Coins</span>
+                <span>Driver: <strong className="text-white">{localStorage.getItem('drivee_name') || 'Driver'}</strong></span>
+                <span className="text-emerald-400 font-mono">0 Coins</span>
               </div>
             </div>
 
@@ -241,8 +243,18 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
             </div>
 
             <div className="space-y-3">
-              {MOCK_VEHICLES.map((vehicle) => {
-                const isSelected = selectedVehicle.id === vehicle.id;
+              {vehicles.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-zinc-400 mb-4">No vehicles registered</p>
+                  <a
+                    href="/register/vehicle"
+                    className="inline-block px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Register Vehicle
+                  </a>
+                </div>
+              ) : vehicles.map((vehicle) => {
+                const isSelected = selectedVehicle?.id === vehicle.id;
                 return (
                   <div
                     key={vehicle.id}
@@ -320,8 +332,8 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 mb-4 flex items-center justify-between">
               <div>
                 <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Kendaraan</span>
-                <h4 className="text-sm font-medium text-white">{selectedVehicle.name}</h4>
-                <p className="text-xs font-mono text-emerald-400">{selectedVehicle.licensePlate} • {selectedVehicle.batteryCapacityKwh} kWh</p>
+                <h4 className="text-sm font-medium text-white">{selectedVehicle?.name || 'No vehicle selected'}</h4>
+                <p className="text-xs font-mono text-emerald-400">{selectedVehicle?.licensePlate || '-'} • {selectedVehicle?.batteryCapacityKwh || 0} kWh</p>
               </div>
               <button
                 onClick={() => setStep('vehicle')}

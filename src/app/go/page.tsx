@@ -8,19 +8,18 @@ import { LoginVehicleScreen } from '@/components/screens/LoginVehicleScreen';
 import { ActiveDrivingHUD } from '@/components/screens/ActiveDrivingHUD';
 import { EndTripDashboard } from '@/components/screens/EndTripDashboard';
 import { InstallBanner } from '@/components/InstallBanner';
-import { MOCK_VEHICLES, MOCK_END_TRIP_RECORD } from '@/lib/mock-data';
 import { EVVehicle, TripRecord, PhotoEvidence } from '@/types/telematics';
 import { TelematicsState } from '@/hooks/useTelematics';
 import { registerServiceWorker, skipWaiting } from '@/lib/sw-register';
-import { setupOnlineSync } from '@/lib/offline-sync';
+import { setupAutoSync } from '@/lib/sync/engine';
 
 function GoApp() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeScreen, setActiveScreen] = useState<ScreenType>('login');
   const [isDrivingActive, setIsDrivingActive] = useState<boolean>(false);
-  const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle>(MOCK_VEHICLES[0]);
-  const [currentTripData, setCurrentTripData] = useState<TripRecord>(MOCK_END_TRIP_RECORD);
+  const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle | null>(null);
+  const [currentTripData, setCurrentTripData] = useState<TripRecord | null>(null);
   const [finalTelemetry, setFinalTelemetry] = useState<TelematicsState | null>(null);
   const [tripStartTime, setTripStartTime] = useState<string>(new Date().toISOString());
   const [swUpdateAvailable, setSwUpdateAvailable] = useState(false);
@@ -43,12 +42,12 @@ function GoApp() {
     }
   }, [router, searchParams]);
 
-  // Register service worker
+  // Register service worker + auto-sync
   useEffect(() => {
     registerServiceWorker();
     const handleUpdate = () => setSwUpdateAvailable(true);
     window.addEventListener('sw-update-available', handleUpdate);
-    const cleanupSync = setupOnlineSync();
+    const cleanupSync = setupAutoSync();
     return () => {
       window.removeEventListener('sw-update-available', handleUpdate);
       cleanupSync();
@@ -101,14 +100,14 @@ function GoApp() {
           <LoginVehicleScreen onStartTrip={handleStartTrip} />
         )}
 
-        {activeScreen === 'hud' && (
+        {activeScreen === 'hud' && currentTripData && (
           <ActiveDrivingHUD
             onEndTrip={handleEndTrip}
             tripId={currentTripData.trip_id}
           />
         )}
 
-        {activeScreen === 'end-trip' && (
+        {activeScreen === 'end-trip' && currentTripData && (
           <EndTripDashboard
             tripData={{...currentTripData, start_time: tripStartTime}}
             finalTelemetry={finalTelemetry}

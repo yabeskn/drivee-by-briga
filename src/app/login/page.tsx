@@ -3,14 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { SessionProvider, useSession } from 'next-auth/react';
-import { GoogleSignInButton } from '@/components/GoogleSignInButton';
+import { SupabaseSignInButton } from '@/components/SupabaseSignInButton';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
-import { LanguageProvider, useLanguage } from '@/i18n/LanguageContext';
+import { LanguageProvider } from '@/i18n/LanguageContext';
 
 function LoginContent() {
   const router = useRouter();
   const { status } = useSession();
-  const { t } = useLanguage();
   const [phone, setPhone] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -44,8 +43,6 @@ function LoginContent() {
     }
   };
 
-
-
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -55,9 +52,11 @@ function LoginContent() {
               <svg viewBox="0 0 512 512" className="w-5 h-5">
                 <rect width="512" height="512" rx="128" fill="#000000"/>
                 <circle cx="256" cy="256" r="200" fill="#052e16" stroke="#10b981" stroke-width="12"/>
-                <path d="M280 120L190 280H270L230 400L350 240H270L280 120Z" fill="#34d399"/>
+                <path d="M280 120L190 280H270L230 400L350 240H270L280 120Z" fill="#10b981"/>
                 <path d="M200 150 L200 362 L280 362 Q350 362 350 256 Q350 150 280 150 Z" fill="none" stroke="#ffffff" stroke-width="16" stroke-linejoin="round"/>
-                <path d="M380 380 Q400 360 380 340 Q360 360 380 380" fill="#10b981"/>
+                <circle cx="380" cy="380" r="24" fill="#F59E0B"/>
+                <text x="380" y="388" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#052e16" text-anchor="middle">$</text>
+                <path d="M130 380 Q150 360 130 340 Q110 360 130 380" fill="#34d399"/>
               </svg>
             </div>
             <span className="text-lg font-semibold text-white">Drifee</span>
@@ -70,7 +69,7 @@ function LoginContent() {
           <p className="text-sm text-zinc-400 mb-4">
             Use your Google account to sign in to Drifee.
           </p>
-          <GoogleSignInButton />
+          <SupabaseSignInButton />
         </div>
 
         <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6">

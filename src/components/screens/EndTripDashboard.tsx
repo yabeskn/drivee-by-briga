@@ -18,7 +18,7 @@ import {
   Loader2,
   Camera,
 } from 'lucide-react';
-import { MOCK_END_TRIP_RECORD, MOCK_DRIVER } from '@/lib/mock-data';
+
 import { TripRecord, PhotoEvidence } from '@/types/telematics';
 import { TelematicsState } from '@/hooks/useTelematics';
 import { submitAndVerifyTrip, type TripSubmissionResult } from '@/lib/trip-submitter';
@@ -26,18 +26,36 @@ import { EcoScoreBreakdown } from '@/lib/eco-score';
 import { CameraCapture } from '@/components/CameraCapture';
 
 interface EndTripDashboardProps {
-  tripData?: TripRecord;
+  tripData?: TripRecord | null;
   finalTelemetry?: TelematicsState | null;
   onStartNewTrip: () => void;
   startPhotoEvidence?: PhotoEvidence;
 }
 
 export function EndTripDashboard({
-  tripData = MOCK_END_TRIP_RECORD,
+  tripData,
   finalTelemetry,
   onStartNewTrip,
   startPhotoEvidence,
 }: EndTripDashboardProps) {
+  // If no trip data, show empty state
+  if (!tripData) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-4">
+          <Trophy className="w-8 h-8 text-zinc-600" />
+        </div>
+        <h2 className="text-lg font-semibold text-white mb-2">No Trip Data</h2>
+        <p className="text-sm text-zinc-400 mb-6">Complete a trip to see your eco-driving summary.</p>
+        <button
+          onClick={onStartNewTrip}
+          className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-colors"
+        >
+          Start New Trip
+        </button>
+      </div>
+    );
+  }
   const [copiedHash, setCopiedHash] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<TripSubmissionResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,7 +99,7 @@ export function EndTripDashboard({
         startOdometerKm: startOdo,
         endOdometerKm: finalOdo,
         batteryCapacityKwh: batteryCapKwh,
-        driverCurrentStreak: MOCK_DRIVER.currentStreak,
+        driverCurrentStreak: 0,
         telemetryState: finalTelemetry,
         startPhotoEvidence: startPhotoEvidence || {
           odometerPhoto: null,
