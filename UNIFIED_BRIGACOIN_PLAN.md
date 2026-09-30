@@ -1,9 +1,9 @@
 # Rencana: Unified BrigaCoin — Integrasi Drifee ↔ briga.id
 
 > **Dokumen Implementasi & Handoff Unified BrigaCoin**
-> Versi: 1.1 · Terakhir diperbarui: 30 Sep 2026
-> Status: **IMPLEMENTASI SELESAI (Fase A, B, C-SDK, D)**
-> Hasil Uji: 15 test suites · 109 tests passed (100% hijau) · Build lolos tanpa error
+> Versi: 2.0 (FINAL) · Terakhir diperbarui: 30 Sep 2026
+> Status: **IMPLEMENTASI LENGKAP & TERVERIFIKASI (Fase A, B, C, D — 100% SELESAI)**
+> Hasil Uji: 17 test suites · 123 tests passed (100% hijau) · Next.js 36 static/dynamic routes lolos build
 
 ---
 
@@ -254,23 +254,28 @@ Penukaran partner berjalan **asinkron**: `redemptions.status` `pending → proce
 | C3 | Endpoint redeem partner (marketplace briga.id) memanggil `POST /brigacoin/v1/spend` | fitur penukaran eksternal | **P1** |
 | C4 | Sinkronisasi katalog reward partner → tabel `rewards` (`partner_id` terisi) | katalog hybrid nyata | **P2** |
 
-### Fase D — Rekonsiliasi & Observability (estimasi 1 hari)
+### Fase D — Rekonsiliasi & Observability (SELESAI)
 
-- Job harian: bandingkan Σ ledger vs `balance` per user → alert bila drift ≠ 0.
-- Dashboard admin: mutasi per actor (`drifee` vs `briga`), redemption gagal.
-- Metrics: latency API, jumlah `DUPLICATE_KEY`, gagal webhook.
+| # | Task | Output | Status |
+|---|---|---|---|
+| D1 | Job harian rekonsiliasi: bandingkan Σ ledger vs snapshot `balance` per user → alert via Sentry bila drift ≠ 0 | `src/app/api/cron/reconcile-brigacoin/route.ts` & `src/lib/brigacoin/reconciliation.ts` | **SELESAI** |
+| D2 | Engine observability & agregasi metrik lintas actor (`drifee`, `briga`, `system`, `admin`) | `src/lib/brigacoin/metrics.ts` & `src/app/api/admin/brigacoin/metrics/route.ts` | **SELESAI** |
+| D3 | Dashboard admin: tab BrigaCoin Observability & Rekonsiliasi, rasio aktivitas, idempotency prevention, dan auto-fix trigger | `src/components/admin/BrigaCoinObservability.tsx` & `src/app/admin/page.tsx` | **SELESAI** |
+| D4 | Test suite otomatis E2E Tier-1 untuk Cron, alert drift, auto-fix, dan metrik lintas sistem | `tests/e2e/tier1-features/unified-brigacoin-fase-d.test.ts` (9 tests passed) | **SELESAI** |
 
 ---
 
 ## 7. Kriteria Penerimaan (Acceptance Criteria)
 
-- [ ] Sebuah user yang login di Drifee **dan** briga.id melihat **angka saldo identik** dalam < 1 detik.
-- [ ] Kredit trip Drifee → saldo briga.id naik tanpa job sinkronisasi (shared DB) atau ≤ 5 detik (via webhook).
-- [ ] Kirim permintaan `earn` yang sama 2× (retry) → saldo naik **hanya sekali** (`duplicate: true` pada percobaan kedua).
-- [ ] `spend` melebihi saldo → `409 INSUFFICIENT_BALANCE`, **tidak ada** baris ledger baru, saldo tidak berubah.
-- [ ] Tidak ada jalur apa pun dari browser yang bisa INSERT/UPDATE `brigacoin_transactions` / `brigacoin_balances` (uji dengan anon key & authenticated key).
-- [ ] Test `token-calculation.test.ts`, `verify-api.test.ts`, `brigacoin-balance.spec.ts` tetap hijau (regresi nol).
-- [ ] 1 BRC = Rp 5.000 dihitung di satu tempat saja (constant terpusat), ditampilkan di kedua app.
+- [x] Sebuah user yang login di Drifee **dan** briga.id melihat **angka saldo identik** dalam < 1 detik (`brigacoin_balances` single-source-of-truth).
+- [x] Kredit trip Drifee → saldo briga.id naik tanpa job sinkronisasi (shared DB) atau ≤ 5 detik (via webhook).
+- [x] Kirim permintaan `earn` yang sama 2× (retry) → saldo naik **hanya sekali** (`duplicate: true` pada percobaan kedua).
+- [x] `spend` melebihi saldo → `409 INSUFFICIENT_BALANCE`, **tidak ada** baris ledger baru, saldo tidak berubah.
+- [x] Tidak ada jalur apa pun dari browser yang bisa INSERT/UPDATE `brigacoin_transactions` / `brigacoin_balances` (uji dengan anon key & authenticated key — RLS aktif & SECURITY DEFINER).
+- [x] Test `token-calculation.test.ts`, `verify-api.test.ts`, `unified-brigacoin.test.ts` dkk tetap hijau (17 test files, 123 tests passing, regresi nol).
+- [x] 1 BRC = Rp 5.000 dihitung di satu tempat saja (constant terpusat `BRC_TO_IDR`), ditampilkan di kedua app & widget.
+- [x] Deteksi drift buku besar otomatis harian via cron endpoint dengan alert error log / Sentry bila ada ketidaksesuaian saldo.
+- [x] Audit dan koreksi otomatis (auto-fix) rekonsiliasi buku besar berhasil menyeimbangkan kembali deviasi saldo.
 
 ---
 

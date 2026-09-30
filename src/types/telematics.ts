@@ -185,12 +185,15 @@ export interface BrigaCoinBalance {
 export interface BrigaCoinTransaction {
   id: string;
   driverId: string;
+  userId?: string;
   type: 'earn' | 'spend' | 'expire' | 'adjust';
   amount: number;
   balance: number;
   source: 'trip' | 'bonus' | 'redemption' | 'referral' | 'adjustment' | 'carbon_offset';
   referenceId?: string;
   description: string;
+  actor?: 'drifee' | 'briga' | 'system' | 'admin';
+  externalRef?: string;
   expiresAt?: Date;
   createdAt: Date;
 }

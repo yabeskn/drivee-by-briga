@@ -41,6 +41,7 @@ export interface AwardResult {
 const memBalanceStore = new Map<string, BrigaCoinBalance>();
 const memTransactionStore = new Map<string, BrigaCoinTransaction[]>();
 const memIdempotencyStore = new Map<string, { ledgerId: string; balance: BrigaCoinBalance }>();
+let memDuplicateAttempts = 0;
 
 function useSupabase(): boolean {
   return isAdminConfigured();
@@ -51,6 +52,23 @@ export function _resetMemStore(): void {
   memBalanceStore.clear();
   memTransactionStore.clear();
   memIdempotencyStore.clear();
+  memDuplicateAttempts = 0;
+}
+
+/** Helper to manually override memory balance for reconciliation/drift tests */
+export function _setMemBalanceForTest(userId: string, balance: number): void {
+  const existing = memBalanceStore.get(userId) ?? {
+    driverId: userId,
+    balance: 0,
+    totalEarned: 0,
+    totalSpent: 0,
+    lastUpdated: new Date(),
+  };
+  memBalanceStore.set(userId, { ...existing, balance, lastUpdated: new Date() });
+}
+
+export function _getMemDuplicateAttempts(): number {
+  return memDuplicateAttempts;
 }
 
 // ── In-Memory Execution Helpers ─────────────────────────────
@@ -62,8 +80,10 @@ function mutateMemoryAward(
   description: string,
   referenceId?: string,
   idempotencyKey?: string,
+  options?: MutateOptions,
 ): AwardResult {
   if (idempotencyKey && memIdempotencyStore.has(idempotencyKey)) {
+    memDuplicateAttempts++;
     const cached = memIdempotencyStore.get(idempotencyKey)!;
     return {
       success: true,
@@ -97,12 +117,15 @@ function mutateMemoryAward(
   const tx: BrigaCoinTransaction = {
     id: ledgerId,
     driverId,
+    userId: options?.userId || driverId,
     type: 'earn',
     amount,
     balance: newBalance,
     source,
     referenceId,
     description,
+    actor: options?.actor || 'drifee',
+    externalRef: options?.externalRef,
     createdAt: new Date(),
   };
 
@@ -124,8 +147,10 @@ function mutateMemorySpend(
   description: string,
   referenceId?: string,
   idempotencyKey?: string,
+  options?: MutateOptions,
 ): SpendResult {
   if (idempotencyKey && memIdempotencyStore.has(idempotencyKey)) {
+    memDuplicateAttempts++;
     const cached = memIdempotencyStore.get(idempotencyKey)!;
     return {
       success: true,
@@ -164,12 +189,15 @@ function mutateMemorySpend(
   const tx: BrigaCoinTransaction = {
     id: ledgerId,
     driverId,
+    userId: options?.userId || driverId,
     type: 'spend',
     amount: -absAmount,
     balance: newBalance,
     source,
     referenceId,
     description,
+    actor: options?.actor || 'drifee',
+    externalRef: options?.externalRef,
     createdAt: new Date(),
   };
 
@@ -182,6 +210,42 @@ function mutateMemorySpend(
   }
 
   return { success: true, duplicate: false, ledgerId, balance: updated };
+}
+
+/** Record adjustment directly into memory store */
+export function mutateMemoryAdjust(
+  userId: string,
+  amount: number,
+  description: string,
+  actor: 'drifee' | 'briga' | 'system' | 'admin' = 'system',
+): void {
+  const existing = memBalanceStore.get(userId) ?? {
+    driverId: userId,
+    balance: 0,
+    totalEarned: 0,
+    totalSpent: 0,
+    lastUpdated: new Date(),
+  };
+
+  const newBalance = existing.balance; // Balance is already at current snapshot
+  const ledgerId = `txn_adj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  const tx: BrigaCoinTransaction = {
+    id: ledgerId,
+    driverId: userId,
+    userId,
+    type: 'adjust',
+    amount,
+    balance: newBalance,
+    source: 'adjustment',
+    description,
+    actor,
+    createdAt: new Date(),
+  };
+
+  const list = memTransactionStore.get(userId) ?? [];
+  list.push(tx);
+  memTransactionStore.set(userId, list);
 }
 
 // ── Get Balance ─────────────────────────────────────────────
@@ -317,7 +381,7 @@ export async function awardBrigaCoins(
   }
 
   // Fallback to in-memory
-  return mutateMemoryAward(driverId, amount, source, description, referenceId, idempotencyKey);
+  return mutateMemoryAward(driverId, amount, source, description, referenceId, idempotencyKey, options);
 }
 
 // ── Spend Balance (Atomic Debit) ─────────────────────────────
@@ -380,7 +444,7 @@ export async function spendBalance(
   }
 
   // Fallback to in-memory
-  return mutateMemorySpend(driverId, absAmount, source, description, referenceId, idempotencyKey);
+  return mutateMemorySpend(driverId, absAmount, source, description, referenceId, idempotencyKey, options);
 }
 
 // ── Get Transactions ────────────────────────────────────────
@@ -399,12 +463,15 @@ export async function getTransactions(driverId: string): Promise<BrigaCoinTransa
         return (data as Record<string, unknown>[]).map((row) => ({
           id: row.id as string,
           driverId: (row.driver_id as string) || (row.user_id as string) || driverId,
+          userId: (row.user_id as string) || undefined,
           type: row.type as BrigaCoinTransaction['type'],
           amount: row.amount as number,
           balance: row.balance_after as number,
           source: row.source as BrigaCoinTransaction['source'],
           referenceId: (row.reference_id as string) ?? undefined,
           description: row.description as string,
+          actor: (row.actor as BrigaCoinTransaction['actor']) || 'drifee',
+          externalRef: (row.external_ref as string) || undefined,
           createdAt: new Date(row.created_at as string),
         }));
       }
@@ -414,6 +481,71 @@ export async function getTransactions(driverId: string): Promise<BrigaCoinTransa
   }
 
   return memTransactionStore.get(driverId) ?? [];
+}
+
+// ── Get All Transactions (Cross-Ecosystem Ledger Stream) ────
+
+export async function getAllTransactions(limit = 100): Promise<BrigaCoinTransaction[]> {
+  if (useSupabase()) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('brigacoin_transactions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (data && data.length > 0) {
+        return (data as Record<string, unknown>[]).map((row) => ({
+          id: row.id as string,
+          driverId: (row.driver_id as string) || (row.user_id as string) || '',
+          userId: (row.user_id as string) || undefined,
+          type: row.type as BrigaCoinTransaction['type'],
+          amount: row.amount as number,
+          balance: row.balance_after as number,
+          source: row.source as BrigaCoinTransaction['source'],
+          referenceId: (row.reference_id as string) ?? undefined,
+          description: row.description as string,
+          actor: (row.actor as BrigaCoinTransaction['actor']) || 'drifee',
+          externalRef: (row.external_ref as string) || undefined,
+          createdAt: new Date(row.created_at as string),
+        }));
+      }
+    } catch {
+      // Fall through to memory
+    }
+  }
+
+  const all: BrigaCoinTransaction[] = [];
+  for (const list of memTransactionStore.values()) {
+    all.push(...list);
+  }
+  return all
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
+}
+
+// ── Get Idempotency Stats ───────────────────────────────────
+
+export async function getIdempotencyStats(): Promise<{ totalKeys: number; duplicateAttempts: number }> {
+  let totalKeys = memIdempotencyStore.size;
+  if (useSupabase()) {
+    try {
+      const { count } = await supabaseAdmin
+        .from('brigacoin_idempotency_keys')
+        .select('*', { count: 'exact', head: true });
+
+      if (typeof count === 'number' && count > 0) {
+        totalKeys = Math.max(totalKeys, count);
+      }
+    } catch {
+      // Fall through to memory
+    }
+  }
+
+  return {
+    totalKeys,
+    duplicateAttempts: memDuplicateAttempts,
+  };
 }
 
 // ── Get All Balances (Admin / Rekonsiliasi) ──────────────────

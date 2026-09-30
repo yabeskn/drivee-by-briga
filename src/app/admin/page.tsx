@@ -24,6 +24,7 @@ import {
   X,
   Battery,
 } from 'lucide-react';
+import { BrigaCoinObservability } from '@/components/admin/BrigaCoinObservability';
 
 // Dynamic import for Leaflet (SSR-incompatible)
 const TripMap = dynamic(
@@ -193,6 +194,7 @@ const MOCK_RAW_GPS: [number, number][] = [
 ];
 
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<'trips' | 'brigacoin'>('trips');
   const [tripList, setTripList] = useState<AdminTrip[]>(MOCK_VERIFIED_TRIPS);
   const [selectedTrip, setSelectedTrip] = useState<AdminTrip>(MOCK_VERIFIED_TRIPS[0]);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED'>('ALL');
@@ -344,8 +346,36 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* KPI Cards Row */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        {/* Navigation Tabs */}
+        <div className="flex items-center space-x-2 border-b border-zinc-800 pb-3 mb-6">
+          <button
+            onClick={() => setActiveTab('trips')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-colors ${
+              activeTab === 'trips'
+                ? 'bg-zinc-800 text-emerald-400 border border-zinc-700'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+            }`}
+          >
+            <Route className="w-4 h-4" />
+            Telematika & Verifikasi Trip
+          </button>
+          <button
+            onClick={() => setActiveTab('brigacoin')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-colors ${
+              activeTab === 'brigacoin'
+                ? 'bg-zinc-800 text-emerald-400 border border-zinc-700'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+            }`}
+          >
+            <Coins className="w-4 h-4" />
+            BrigaCoin Observability & Rekonsiliasi
+          </button>
+        </div>
+
+        {activeTab === 'trips' ? (
+          <>
+            {/* KPI Cards Row */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           {[
             { label: 'Total Trips', value: totalTrips, icon: Route, color: 'text-cyan-400' },
             {
@@ -652,6 +682,10 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+        </>
+      ) : (
+        <BrigaCoinObservability />
+      )}
       </div>
     </div>
   );
