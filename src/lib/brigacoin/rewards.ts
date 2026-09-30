@@ -81,13 +81,17 @@ export async function getRewards(
 
 export async function getRewardById(id: string): Promise<Reward | undefined> {
   if (useSupabase()) {
-    const { data } = await supabaseAdmin
-      .from('rewards')
-      .select('*')
-      .eq('id', id)
-      .single();
+    try {
+      const { data } = await supabaseAdmin
+        .from('rewards')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
-    return data ? rowToReward(data) : undefined;
+      if (data) return rowToReward(data);
+    } catch {
+      // Fall through to memory catalog
+    }
   }
 
   return fallbackCatalog.find((r) => r.id === id);
