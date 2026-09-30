@@ -45,5 +45,6 @@ next-env.d.ts
 # OS
 Thumbs.db
 
-# Agent workflow files (Codebuff/teamwork briefings & skills)
-.agents/
+# Agent workflow files (Codebuff teamwork briefings & dispatches)
+# NOTE: .agents/skills/ tetap di-track agar dibagikan ke tim
+.agents/teamwork/
