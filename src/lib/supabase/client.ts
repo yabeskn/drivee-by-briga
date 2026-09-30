@@ -11,6 +11,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-export function isSupabaseConfigured(): boolean {
-  return Boolean(supabaseUrl && supabaseAnonKey);
-}
+export const getSupabaseServerClient = () => {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+};

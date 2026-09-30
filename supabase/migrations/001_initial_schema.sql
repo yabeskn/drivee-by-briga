@@ -1,158 +1,136 @@
 -- ─────────────────────────────────────────────────────────────
--- Drifee by Briga — Initial Database Schema
+-- Drivee by Briga - Initial Database Schema
 -- Supabase PostgreSQL
 -- ─────────────────────────────────────────────────────────────
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ── Drivers ─────────────────────────────────────────────────
+-- ── Drivers Table ────────────────────────────────────────────
 CREATE TABLE drivers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   google_id VARCHAR(255) UNIQUE,
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
   phone VARCHAR(20),
-  phone_verified BOOLEAN DEFAULT FALSE,
-  vehicle_id UUID,
-  briga_coin_balance INTEGER DEFAULT 0,
+  avatar_url TEXT,
+  total_briga_coins INTEGER DEFAULT 0,
+  current_streak INTEGER DEFAULT 0,
+  average_eco_score DECIMAL(5,2) DEFAULT 0,
+  total_trips_completed INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ── Vehicles ────────────────────────────────────────────────
+-- ── Vehicles Table ───────────────────────────────────────────
 CREATE TABLE vehicles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE,
-  category VARCHAR(20) CHECK (category IN ('standard', 'professional', 'premium', 'premium_plus')),
-  brand VARCHAR(100) NOT NULL,
-  model VARCHAR(100) NOT NULL,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  code VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  model VARCHAR(255),
   license_plate VARCHAR(20) UNIQUE NOT NULL,
-  battery_capacity_kwh DECIMAL(5,2),
-  status VARCHAR(20) DEFAULT 'active',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  battery_capacity_kwh DECIMAL(6,2),
+  efficiency_kwh_per_100km DECIMAL(5,2),
+  hub_location VARCHAR(255),
+  status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'in_service', 'charging', 'maintenance')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Add foreign key from drivers to vehicles
-ALTER TABLE drivers ADD CONSTRAINT fk_vehicle
-  FOREIGN KEY (vehicle_id) REFERENCES vehicles(id);
-
--- ── Trips ───────────────────────────────────────────────────
+-- ── Trips Table ──────────────────────────────────────────────
 CREATE TABLE trips (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trip_id VARCHAR(50) UNIQUE NOT NULL,
   driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE,
-  vehicle_id UUID REFERENCES vehicles(id) ON DELETE CASCADE,
+  vehicle_id UUID REFERENCES vehicles(id) ON DELETE SET NULL,
   start_time TIMESTAMP WITH TIME ZONE NOT NULL,
   end_time TIMESTAMP WITH TIME ZONE,
-  distance_km DECIMAL(8,2),
-  eco_score INTEGER,
+  profile_used VARCHAR(20) CHECK (profile_used IN ('HIGHWAY_NORMAL', 'URBAN_RUSH_HOUR')),
+  start_battery_soc DECIMAL(5,2),
+  end_battery_soc DECIMAL(5,2),
+  start_odometer_km DECIMAL(10,2),
+  end_odometer_km DECIMAL(10,2),
+  distance_km DECIMAL(8,2) DEFAULT 0,
+  energy_used_kwh DECIMAL(8,2) DEFAULT 0,
+  eco_score INTEGER DEFAULT 0,
   eco_grade VARCHAR(2),
   tokens_earned INTEGER DEFAULT 0,
   trip_hash VARCHAR(64),
-  verification_status VARCHAR(20) DEFAULT 'pending',
+  verification_status VARCHAR(20) DEFAULT 'pending' CHECK (verification_status IN ('pending', 'verified', 'rejected')),
+  esg_co2_avoided_kg DECIMAL(8,2) DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ── Telemetry Points Table ───────────────────────────────────
+CREATE TABLE telemetry_points (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  timestamp BIGINT NOT NULL,
+  lat DECIMAL(10,8) NOT NULL,
+  lng DECIMAL(11,8) NOT NULL,
+  accuracy DECIMAL(6,2),
+  speed_mps DECIMAL(6,2),
+  speed_kmh DECIMAL(6,2),
+  heading DECIMAL(5,2),
+  altitude DECIMAL(8,2),
+  accel_x DECIMAL(6,3),
+  accel_y DECIMAL(6,3),
+  accel_z DECIMAL(6,3),
+  accel_magnitude DECIMAL(6,3),
+  polling_interval_ms INTEGER,
+  is_accel_paused BOOLEAN DEFAULT FALSE,
+  driving_status VARCHAR(20) CHECK (driving_status IN ('smooth', 'harsh_accel', 'sudden_brake', 'idle')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ── BrigaCoin Transactions ──────────────────────────────────
-CREATE TABLE brigacoin_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- ── BrigaCoin Transactions Table ────────────────────────────
+CREATE TABLE briga_coin_transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE,
-  type VARCHAR(20) CHECK (type IN ('earn', 'spend', 'expire', 'adjust')),
+  trip_id UUID REFERENCES trips(id) ON DELETE SET NULL,
+  type VARCHAR(20) NOT NULL CHECK (type IN ('earn', 'spend', 'expire', 'adjust')),
   amount INTEGER NOT NULL,
   balance_after INTEGER NOT NULL,
   source VARCHAR(50),
-  reference_id UUID,
   description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ── HR Rentals ──────────────────────────────────────────────
-CREATE TABLE hr_rentals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL,
-  package_type VARCHAR(20),
-  vehicle_id UUID REFERENCES vehicles(id),
-  driver_id UUID REFERENCES drivers(id),
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  total_price DECIMAL(12,2),
-  payment_status VARCHAR(20) DEFAULT 'pending',
-  payment_reference VARCHAR(100),
+-- ── Trip Rewards Table ───────────────────────────────────────
+CREATE TABLE trip_rewards (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  base_reward INTEGER DEFAULT 0,
+  eco_multiplier DECIMAL(3,2) DEFAULT 1.00,
+  multiplier_reward INTEGER DEFAULT 0,
+  streak_bonus INTEGER DEFAULT 0,
+  anti_spoofing_bonus INTEGER DEFAULT 0,
+  total_reward INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ── Scope 3 Emissions ───────────────────────────────────────
-CREATE TABLE scope3_emissions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL,
-  rental_id UUID REFERENCES hr_rentals(id) ON DELETE CASCADE,
-  category VARCHAR(20),
-  distance_km DECIMAL(8,2),
-  emission_factor DECIMAL(6,4),
-  total_emission_kg DECIMAL(10,2),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ── Carbon Offsets ──────────────────────────────────────────
-CREATE TABLE carbon_offsets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL,
-  amount_kg DECIMAL(10,2),
-  type VARCHAR(20),
-  cost DECIMAL(12,2),
-  brc_earned INTEGER,
-  certificate_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ── Indexes ─────────────────────────────────────────────────
-CREATE INDEX idx_drivers_email ON drivers(email);
-CREATE INDEX idx_drivers_google_id ON drivers(google_id);
-CREATE INDEX idx_vehicles_driver_id ON vehicles(driver_id);
+-- ── Indexes ──────────────────────────────────────────────────
 CREATE INDEX idx_trips_driver_id ON trips(driver_id);
 CREATE INDEX idx_trips_vehicle_id ON trips(vehicle_id);
-CREATE INDEX idx_brigacoin_driver_id ON brigacoin_transactions(driver_id);
-CREATE INDEX idx_hr_rentals_company_id ON hr_rentals(company_id);
-CREATE INDEX idx_scope3_company_id ON scope3_emissions(company_id);
+CREATE INDEX idx_trips_trip_id ON trips(trip_id);
+CREATE INDEX idx_trips_verification_status ON trips(verification_status);
+CREATE INDEX idx_telemetry_trip_id ON telemetry_points(trip_id);
+CREATE INDEX idx_telemetry_timestamp ON telemetry_points(timestamp);
+CREATE INDEX idx_briga_coin_driver_id ON briga_coin_transactions(driver_id);
+CREATE INDEX idx_briga_coin_trip_id ON briga_coin_transactions(trip_id);
+CREATE INDEX idx_trip_rewards_trip_id ON trip_rewards(trip_id);
 
--- ── RLS Policies ────────────────────────────────────────────
+-- ── Update Trigger Function ─────────────────────────────────
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
 
--- Enable RLS on all tables
-ALTER TABLE drivers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE vehicles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
-ALTER TABLE brigacoin_transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE hr_rentals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scope3_emissions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE carbon_offsets ENABLE ROW LEVEL SECURITY;
-
--- Drivers: users can read/update their own data
-CREATE POLICY "Drivers can read own data" ON drivers
-  FOR SELECT USING (auth.uid()::text = id::text);
-
-CREATE POLICY "Drivers can update own data" ON drivers
-  FOR UPDATE USING (auth.uid()::text = id::text);
-
--- Vehicles: users can read their own vehicles
-CREATE POLICY "Users can read own vehicles" ON vehicles
-  FOR SELECT USING (auth.uid()::text = driver_id::text);
-
--- Trips: users can read their own trips
-CREATE POLICY "Users can read own trips" ON trips
-  FOR SELECT USING (auth.uid()::text = driver_id::text);
-
--- BrigaCoin: users can read their own transactions
-CREATE POLICY "Users can read own transactions" ON brigacoin_transactions
-  FOR SELECT USING (auth.uid()::text = driver_id::text);
-
--- ── Storage Bucket ──────────────────────────────────────────
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('drifee-photos', 'drifee-photos', true);
-
--- Storage policy: anyone can read
-CREATE POLICY "Public read access" ON storage.objects
-  FOR SELECT USING (bucket_id = 'drifee-photos');
-
--- Storage policy: authenticated users can upload
-CREATE POLICY "Authenticated upload" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'drifee-photos' AND auth.role() = 'authenticated');
+-- ── Apply Update Triggers ────────────────────────────────────
+CREATE TRIGGER update_drivers_updated_at BEFORE UPDATE ON drivers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_vehicles_updated_at BEFORE UPDATE ON vehicles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_trips_updated_at BEFORE UPDATE ON trips FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

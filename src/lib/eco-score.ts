@@ -268,40 +268,45 @@ export interface TokenRewardResult {
   multiplierReward: number;
   streakBonus: number;
   totalReward: number;
+  newStreak?: number;
+  isStreakQualifying?: boolean;
 }
 
 /**
- * Kalkulasi BrigaCoins reward (PRD Section 3.1).
- *  - Base: 10 coins jika jarak ≥ 15 km
- *  - Multiplier: score ≥ 90 → 2.0x, ≥ 80 → 1.5x, ≥ 70 → 1.0x, else 0.5x
- *  - Streak bonus: setiap 5 trip berturut-turut ≥ 85 → +50 coins
+ * Kalkulasi BrigaCoins reward (ORIGINAL_REQUEST.md / PRD Section 3.1).
+ *  - Base Reward = distance_km * 10
+ *  - Eco Multiplier = (eco_score / 100) * 0.5 * Base Reward
+ *  - Streak Bonus = +50 every 5th consecutive trip with eco_score >= 85
+ *  - Total = Math.round(base_reward + multiplier_reward + streak_bonus)
  */
 export function calculateTokenReward(input: TokenRewardInput): TokenRewardResult {
   const { ecoScore, distanceKm, currentStreak } = input;
 
-  // Base reward
-  const baseReward = distanceKm >= 15 ? 10 : 5;
+  // Base reward: 10 coins per km
+  const baseReward = distanceKm * 10;
 
-  // Eco multiplier
-  let ecoMultiplier: number;
-  if (ecoScore >= 90) ecoMultiplier = 2.0;
-  else if (ecoScore >= 80) ecoMultiplier = 1.5;
-  else if (ecoScore >= 70) ecoMultiplier = 1.0;
-  else ecoMultiplier = 0.5;
+  // Eco multiplier: (eco_score / 100) * 0.5 * Base
+  const clampedEco = Math.max(0, Math.min(100, ecoScore));
+  const ecoMultiplier = (clampedEco / 100) * 0.5;
+  const multiplierReward = ecoMultiplier * baseReward;
 
-  const multiplierReward = Math.round(baseReward * ecoMultiplier);
+  // Streak logic: Qualifying trip requires eco_score >= 85
+  const isStreakQualifying = ecoScore >= 85;
+  const newStreak = isStreakQualifying ? currentStreak + 1 : 0;
 
-  // Streak bonus — triggers on every 5th consecutive qualifying trip
-  // currentStreak is the count *after* this trip is added
-  const newStreak = ecoScore >= 85 ? currentStreak + 1 : 0;
-  const streakBonus = newStreak > 0 && newStreak % 5 === 0 ? 50 : 0;
+  // Streak bonus: +50 on every 5th consecutive qualifying trip (5, 10, 15, ...)
+  const streakBonus = isStreakQualifying && newStreak > 0 && newStreak % 5 === 0 ? 50 : 0;
+
+  const totalReward = Math.round(baseReward + multiplierReward + streakBonus);
 
   return {
     baseReward,
     ecoMultiplier,
     multiplierReward,
     streakBonus,
-    totalReward: baseReward + multiplierReward + streakBonus,
+    totalReward,
+    newStreak,
+    isStreakQualifying,
   };
 }
 

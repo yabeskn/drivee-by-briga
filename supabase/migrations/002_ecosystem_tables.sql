@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS redemptions (
 
 -- ── Companies (for HR Rental / ESG) ────────────────────────
 CREATE TABLE IF NOT EXISTS companies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id VARCHAR(255) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255),
   industry VARCHAR(100),
@@ -74,7 +74,30 @@ ALTER TABLE drivers ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'driver';
 
 -- ── Add company_id FK to hr_rentals (if not exists) ────────
 DO $$
+DECLARE
+  comp_id_type text;
+  hr_comp_type text;
 BEGIN
+  -- Check column types
+  SELECT data_type INTO comp_id_type
+  FROM information_schema.columns 
+  WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'id';
+
+  SELECT data_type INTO hr_comp_type
+  FROM information_schema.columns 
+  WHERE table_schema = 'public' AND table_name = 'hr_rentals' AND column_name = 'company_id';
+
+  -- If companies.id is varchar/text and hr_rentals.company_id is uuid, alter hr_rentals.company_id
+  IF comp_id_type LIKE '%char%' OR comp_id_type = 'text' THEN
+    IF hr_comp_type = 'uuid' THEN
+      ALTER TABLE hr_rentals ALTER COLUMN company_id TYPE VARCHAR(255);
+    END IF;
+  ELSIF comp_id_type = 'uuid' THEN
+    IF hr_comp_type IS NOT NULL AND hr_comp_type != 'uuid' THEN
+      ALTER TABLE hr_rentals ALTER COLUMN company_id TYPE UUID USING company_id::uuid;
+    END IF;
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.table_constraints 
     WHERE constraint_name = 'fk_hr_company'
@@ -98,22 +121,18 @@ CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
 -- Trips: drivers can INSERT their own trips
 DO $$ BEGIN
   CREATE POLICY "Drivers can insert own trips" ON trips
-    FOR INSERT WITH CHECK (auth.uid()::text = driver_id::text);
+    FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = driver_id);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- BrigaCoin: drivers can insert own transactions
-DO $$ BEGIN
-  CREATE POLICY "Drivers can insert own transactions" ON brigacoin_transactions
-    FOR INSERT WITH CHECK (auth.uid()::text = driver_id::text);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- BrigaCoin: drivers CANNOT insert transactions directly (restricted to service_role)
+DROP POLICY IF EXISTS "Drivers can insert own transactions" ON brigacoin_transactions;
 
 -- Rewards: anyone authenticated can read active rewards
 ALTER TABLE rewards ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   CREATE POLICY "Anyone can read active rewards" ON rewards
-    FOR SELECT USING (status = 'active');
+    FOR SELECT TO authenticated USING (status = 'active');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -121,12 +140,12 @@ END $$;
 ALTER TABLE redemptions ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   CREATE POLICY "Drivers can read own redemptions" ON redemptions
-    FOR SELECT USING (auth.uid()::text = driver_id::text);
+    FOR SELECT TO authenticated USING ((SELECT auth.uid()) = driver_id);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 DO $$ BEGIN
   CREATE POLICY "Drivers can insert own redemptions" ON redemptions
-    FOR INSERT WITH CHECK (auth.uid()::text = driver_id::text);
+    FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = driver_id);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
