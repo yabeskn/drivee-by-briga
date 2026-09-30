@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
 // ─────────────────────────────────────────────────────────────
 // middleware.ts — Route Protection (Invisible Security layer 0)
@@ -8,45 +9,38 @@ import type { NextRequest } from 'next/server';
 //  - Rute privat WAJIB login: /admin, /company, /rewards,
 //    /special-track, /verify, /go
 //  - Pengunjung tanpa sesi → 307 redirect ke /login?next=<path>
-//  - localStorage TIDAK dipercaya — hanya cookie sesi server
-//    (sb-access-token disetel oleh /auth/callback setelah PKCE
-//    exchange; next-auth.session-token untuk kompatibilitas lama)
+//  - Cookie sesi TIDAK hanya dicek keberadaannya — JWT-nya
+//    DIVERIFIKASI (signature + exp) sebelum akses diberikan.
+//    localStorage flag (drivee_logged_in) sengaja TIDAK dipercaya
+//    (spoofable dari DevTools).
+//  - Verifikasi signature:
+//      1) Asimetris via JWKS proyek Supabase (JWT signing keys),
+//      2) Fallback HS256 memakai SUPABASE_JWT_SECRET (legacy)
+//         atau anon key.
+//    Fail-closed: token tidak ada / tidak valid → redirect login.
 //  - Parameter `next` disanitasi: hanya path internal relatif,
 //    mencegah open-redirect
 // ─────────────────────────────────────────────────────────────
 
 /** Rute privat yang wajib sesi valid */
 export const PROTECTED_ROUTES = [
-	'/admin',
-	'/company',
-	'/rewards',
-	'/special-track',
-	'/verify',
-	'/go',
+	"/admin",
+	"/company",
+	"/rewards",
+	"/special-track",
+	"/verify",
+	"/go",
 ];
 
 /** Rute publik — tidak pernah diblokir middleware */
 export const PUBLIC_ROUTES = [
-	'/',
-	'/login',
-	'/landing',
-	'/register',
-	'/auth/callback',
-	'/api/auth',
+	"/",
+	"/login",
+	"/landing",
+	"/register",
+	"/auth/callback",
+	"/api/auth",
 ];
-
-/** Cookie sesi yang diakui (Supabase PKCE + legacy next-auth) */
-const SESSION_COOKIE_NAMES = [
-	'sb-access-token',
-	'next-auth.session-token',
-	'__Secure-next-auth.session-token',
-];
-
-function hasSessionCookie(request: NextRequest): boolean {
-	return SESSION_COOKIE_NAMES.some((name) =>
-		Boolean(request.cookies.get(name)?.value),
-	);
-}
 
 /**
  * Sanitasi parameter `next`: hanya path internal relatif yang
@@ -55,21 +49,84 @@ function hasSessionCookie(request: NextRequest): boolean {
  */
 function sanitizeNextPath(rawPath: string): string {
 	if (
-		rawPath.startsWith('/') &&
-		!rawPath.startsWith('//') &&
-		!rawPath.includes('\\')
+		rawPath.startsWith("/") &&
+		!rawPath.startsWith("//") &&
+		!rawPath.includes("\\")
 	) {
 		return rawPath;
 	}
-	return '/go';
+	return "/go";
 }
 
-export function middleware(request: NextRequest) {
+// ── Verifikasi JWT sesi Supabase ────────────────────────────
+
+interface SessionClaims {
+	sub?: string;
+	email?: string;
+	[key: string]: unknown;
+}
+
+// JWKS dibuat sekali per isolat & di-cache (jose meng-cache key
+// secara internal dengan rate limiting fetch bawaan).
+let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null | undefined;
+
+function getSupabaseUrl(): string | null {
+	return process.env.NEXT_PUBLIC_SUPABASE_URL || null;
+}
+
+function getRemoteJwks() {
+	if (cachedJwks !== undefined) return cachedJwks;
+	const supabaseUrl = getSupabaseUrl();
+	cachedJwks = supabaseUrl
+		? createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`))
+		: null;
+	return cachedJwks;
+}
+
+/**
+ * Verifikasi JWT sesi Supabase:
+ *  1. Asimetris (RS/ES/EdDSA) via JWKS `NEXT_PUBLIC_SUPABASE_URL/auth/v1/`
+ *     — dipakai Supabase ketika "JWT Signing Keys" asimetris aktif.
+ *  2. Fallback HS256 memakai `SUPABASE_JWT_SECRET` (legacy) atau
+ *     anon key — dipakai project dengan JWT secret bersama.
+ * Issuer divalidasi bila URL Supabase diketahui.
+ * Mengembalikan claims bila valid, null bila tidak (fail-closed).
+ */
+async function verifySessionJwt(token: string): Promise<SessionClaims | null> {
+	const supabaseUrl = getSupabaseUrl();
+	const issuer = supabaseUrl ? `${supabaseUrl}/auth/v1` : undefined;
+
+	try {
+		const jwks = getRemoteJwks();
+		if (jwks) {
+			try {
+				const { payload } = await jwtVerify(token, jwks, { issuer });
+				return payload as SessionClaims;
+			} catch {
+				// Bukan token asimetris / JWKS belum tersedia → coba HS256
+			}
+		}
+
+		const secret =
+			process.env.SUPABASE_JWT_SECRET ||
+			process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+		if (!secret) return null;
+
+		const key = new TextEncoder().encode(secret);
+		const { payload } = await jwtVerify(token, key, { issuer });
+		return payload as SessionClaims;
+	} catch {
+		// Signature/exp/issuer tidak valid → sesi ditolak
+		return null;
+	}
+}
+
+export async function middleware(request: NextRequest) {
 	const { pathname, search } = request.nextUrl;
 
 	// API routes melakukan otorisasi sendiri di route handler
 	// (mis. /api/trips/verify memverifikasi hash & UUID payload)
-	if (pathname.startsWith('/api/')) {
+	if (pathname.startsWith("/api/")) {
 		return NextResponse.next();
 	}
 
@@ -81,15 +138,20 @@ export function middleware(request: NextRequest) {
 		return NextResponse.next();
 	}
 
-	// Sudah punya cookie sesi → lanjutkan
-	if (hasSessionCookie(request)) {
-		return NextResponse.next();
+	// Verifikasi JWT sesi — bukan sekadar keberadaan cookie.
+	// Cookie spoofed tanpa signature valid → ditolak di sini.
+	const token = request.cookies.get("sb-access-token")?.value;
+	if (token) {
+		const claims = await verifySessionJwt(token);
+		if (claims?.sub) {
+			return NextResponse.next();
+		}
 	}
 
-	// Tanpa sesi → 307 ke /login dengan `next` yang disanitasi.
+	// Tanpa sesi valid → 307 ke /login dengan `next` yang disanitasi.
 	// localStorage flag (drivee_logged_in) sengaja TIDAK dipercaya:
 	// bisa dipalsukan dari DevTools tanpa sesi server yang valid.
-	const destination = sanitizeNextPath(`${pathname}${search}` || '/go');
+	const destination = sanitizeNextPath(`${pathname}${search}` || "/go");
 	const loginUrl = new URL(
 		`/login?next=${encodeURIComponent(destination)}`,
 		request.url,
@@ -100,6 +162,6 @@ export function middleware(request: NextRequest) {
 export const config = {
 	// Jalankan middleware di semua path kecuali aset statis & file PWA
 	matcher: [
-		'/((?!_next/|favicon.ico|sw.js|manifest.json|offline.html|icon-|icon.svg|browserconfig.xml).*)',
+		"/((?!_next/|favicon.ico|sw.js|manifest.json|offline.html|icon-|icon.svg|browserconfig.xml).*)",
 	],
 };

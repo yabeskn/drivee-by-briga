@@ -22,7 +22,7 @@
 | 10 | Google OAuth PKCE Route Handler | Implement `/auth/callback/route.ts` to exchange OAuth code for Supabase session | M3 | ORIGINAL_REQUEST §R3 |
 | 11 | Session Persistence & Auth State | Secure session persistence using Supabase Auth sessions; remove insecure spoofable localStorage bypass | M3 | ORIGINAL_REQUEST §R3 |
 | 12 | Route Protection Middleware | Implement `src/middleware.ts` to protect private views (`/admin`, `/company`, `/rewards`, `/special-track`, `/verify`, `/go`) and secure API routes | M3 | ORIGINAL_REQUEST §R3 |
-| 13 | Unit Test Infrastructure | Configure `vitest.config.ts` and `"test": "vitest run"` in `package.json` | M4 | ORIGINAL_REQUEST §R4 |
+| 13 | Unit Test Infrastructure | Configure `vitest.config.mts` and `"test": "vitest run"` in `package.json` | M4 | ORIGINAL_REQUEST §R4 |
 | 14 | Automated Unit Test Suite | Comprehensive unit tests for token rewards, streak logic, anti-spoofing, physics checks with 100% pass rate | M4 | ORIGINAL_REQUEST §R4 |
 | 15 | Environment & Setup Documentation | Document local setup, required environment variables, Supabase migrations, and Vercel configuration in README.md | M5 | ORIGINAL_REQUEST §R5 |
 | 16 | E2E Testing Suite (Tiers 1-4) | Opaque-box requirement-driven test suite verifying verification API, economics, auth, and database integrity | E2E Track | ORIGINAL_REQUEST Acceptance Criteria |
@@ -34,10 +34,10 @@
 | E2E | E2E Testing Suite Track | Opaque-box test harness & test suite (Tiers 1-4) publishing `TEST_READY.md` | none | DONE |
 | M1 | Database Migrations & Model Integrity | PostgreSQL migration for `telemetry_points`, fix `fk_hr_company`, update `schema.ts`, harden RLS | none | DONE |
 | M2 | Trip Verification API & Token Economics Hardening | POST `/api/trips/verify` physics checks (<= 160 km/h, energy >= 0), HTTP 400 rejection, hash alignment, token formulas (Base, Eco, Streak), driver streak and transaction ledger updates | M1 | DONE |
-| M3 | Authentication & Route Protection Audit | Google Sign-In PKCE callback, secure session handling, `src/middleware.ts` route protection | M1 | PLANNED |
-| M4 | Unit Testing Suite & Verification Logic | Vitest config, npm test script, unit tests for token economics, physics, and verification rules | M2 | PLANNED |
-| M5 | Setup Documentation & Environment Config | Comprehensive README.md, .env.example, Supabase & Vercel deployment docs | M1, M2, M3, M4 | PLANNED |
-| M6 | Final Milestone & Build Validation | Pass 100% E2E tests, verify `npm test` and `npm run build` pass with 0 errors | M1, M2, M3, M4, M5, E2E | PLANNED |
+| M3 | Authentication & Route Protection Audit | Google Sign-In PKCE callback, secure session handling, `src/middleware.ts` route protection | M1 | DONE |
+| M4 | Unit Testing Suite & Verification Logic | Vitest config, npm test script, unit tests for token economics, physics, and verification rules | M2 | DONE |
+| M5 | Setup Documentation & Environment Config | Comprehensive README.md, .env.example, Supabase & Vercel deployment docs | M1, M2, M3, M4 | DONE |
+| M6 | Final Milestone & Build Validation | Pass 100% E2E tests, verify `npm test` and `npm run build` pass with 0 errors | M1, M2, M3, M4, M5, E2E | DONE |
 
 ## Interface Contracts
 ### Client ↔ Verification API (`POST /api/trips/verify`)

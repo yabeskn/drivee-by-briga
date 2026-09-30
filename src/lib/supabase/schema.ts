@@ -117,6 +117,15 @@ export interface Database {
 					avg_speed_kmh: number | null;
 					co2_avoided_kg: number | null;
 					osrm_matched_route: Record<string, unknown> | null;
+					/** Scope 3 absolut — deadhead (jarak kosong menuju jemput), default 0 (migration 004) */
+					deadhead_distance_km: number;
+					/** Scope 3 absolut — jarak dengan penumpang; deadhead + revenue = distance_km (migration 004) */
+					revenue_distance_km: number;
+					/** Timeline transisi fase trip: [{ from, to, at }] (migration 004) */
+					trip_phase_timeline: TripPhaseTransitionRow[];
+					/** Flag anomali watchdog (Fake GPS) — audit Invisible Security (migration 004) */
+					watchdog_flagged: boolean;
+					watchdog_anomaly_reason: string | null;
 					created_at: string;
 				};
 				Insert: {
@@ -142,6 +151,11 @@ export interface Database {
 					avg_speed_kmh?: number | null;
 					co2_avoided_kg?: number | null;
 					osrm_matched_route?: Record<string, unknown> | null;
+					deadhead_distance_km?: number;
+					revenue_distance_km?: number;
+					trip_phase_timeline?: TripPhaseTransitionRow[] | null;
+					watchdog_flagged?: boolean;
+					watchdog_anomaly_reason?: string | null;
 					created_at?: string;
 				};
 				Update: {
@@ -167,6 +181,11 @@ export interface Database {
 					avg_speed_kmh?: number | null;
 					co2_avoided_kg?: number | null;
 					osrm_matched_route?: Record<string, unknown> | null;
+					deadhead_distance_km?: number;
+					revenue_distance_km?: number;
+					trip_phase_timeline?: TripPhaseTransitionRow[] | null;
+					watchdog_flagged?: boolean;
+					watchdog_anomaly_reason?: string | null;
 					created_at?: string;
 				};
 			};
@@ -180,6 +199,8 @@ export interface Database {
 					source: string;
 					reference_id: string | null;
 					description: string;
+					/** Trip pemicu transaksi (migration 004) */
+					trip_id: string | null;
 					created_at: string;
 				};
 				Insert: {
@@ -191,6 +212,7 @@ export interface Database {
 					source: string;
 					reference_id?: string | null;
 					description: string;
+					trip_id?: string | null;
 					created_at?: string;
 				};
 				Update: {
@@ -202,6 +224,7 @@ export interface Database {
 					source?: string;
 					reference_id?: string | null;
 					description?: string;
+					trip_id?: string | null;
 					created_at?: string;
 				};
 			};
@@ -442,6 +465,16 @@ export interface Database {
 			};
 		};
 	};
+}
+
+/** Entri timeline transisi fase trip — disimpan sebagai JSONB di trips.trip_phase_timeline */
+export interface TripPhaseTransitionRow {
+	/** Fase asal (mis. "IDLE") */
+	from: string;
+	/** Fase tujuan (mis. "DISPATCHED") */
+	to: string;
+	/** Waktu transisi (ISO-8601) */
+	at: string;
 }
 
 export type DriverRow = Database["public"]["Tables"]["drivers"]["Row"];

@@ -112,6 +112,16 @@ export const validTripRow: TripRow = {
 		duration: 2100,
 		geometry: "mock_polyline",
 	},
+	// Migration 004 — Trip Lifecycle & Invisible Security
+	deadhead_distance_km: 4.2,
+	revenue_distance_km: 14.3,
+	trip_phase_timeline: [
+		{ from: "IDLE", to: "DISPATCHED", at: "2026-09-30T07:52:00Z" },
+		{ from: "DISPATCHED", to: "PASSENGER_PICKED_UP", at: "2026-09-30T08:00:00Z" },
+		{ from: "PASSENGER_PICKED_UP", to: "COMPLETED", at: "2026-09-30T08:35:00Z" },
+	],
+	watchdog_flagged: false,
+	watchdog_anomaly_reason: null,
 	created_at: "2026-09-30T08:36:00Z",
 };
 
@@ -257,6 +267,8 @@ export const validBrigacoinTransactionRow: BrigacoinTransactionRow = {
 	source: "trip",
 	reference_id: "trip_1727678400000_abc123",
 	description: "Trip reward (18.5 km, Eco Score 92)",
+	// Migration 004 — ledger merujuk trip pemicunya
+	trip_id: "550e8400-e29b-41d4-a716-446655440010",
 	created_at: "2026-09-30T08:36:00Z",
 };
 

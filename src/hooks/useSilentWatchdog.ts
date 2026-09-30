@@ -19,6 +19,10 @@
 // Jika status menjadi ANOMALY_DETECTED, UI me-render modal
 // LiveProofCapture untuk membekukan aplikasi sampai foto dasbor
 // (odometer & baterai) divalidasi.
+//
+// iOS 13+: DeviceMotionEvent/DeviceOrientationEvent butuh izin
+// eksplisit via requestPermission() (dipanggil di sini saat trip
+// aktif; izin ditolak → fail-closed ANOMALY_DETECTED).
 // ─────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -71,6 +75,38 @@ export interface UseSilentWatchdogOptions {
 export interface SilentWatchdogApi extends SilentWatchdogState {
 	/** Reset ke RUNNING ulang (mis. setelah proof divalidasi, terjadi trip baru) */
 	reset: () => void;
+}
+
+// ── iOS 13+ motion permission ───────────────────────────────
+// Safari membatasi akses sensor di balik requestPermission(). Di
+// platform lain properti ini tidak ada → langsung dianggap granted.
+type PermissionAwareSensorConstructor = {
+	requestPermission?: () => Promise<"granted" | "denied" | "default">;
+};
+
+async function requestMotionPermission(): Promise<boolean> {
+	if (typeof window === "undefined") return false;
+	try {
+		const motionCtor = window.DeviceMotionEvent as unknown as
+			| PermissionAwareSensorConstructor
+			| undefined;
+		const orientationCtor = window.DeviceOrientationEvent as unknown as
+			| PermissionAwareSensorConstructor
+			| undefined;
+
+		if (typeof motionCtor?.requestPermission === "function") {
+			const state = await motionCtor.requestPermission();
+			if (state !== "granted") return false;
+		}
+		if (typeof orientationCtor?.requestPermission === "function") {
+			const state = await orientationCtor.requestPermission();
+			if (state !== "granted") return false;
+		}
+		return true;
+	} catch {
+		// NotAllowedError (dipanggil di luar user gesture) / security error
+		return false;
+	}
 }
 
 export function useSilentWatchdog({
@@ -206,11 +242,49 @@ export function useSilentWatchdog({
 		const hasOrientation =
 			typeof window !== "undefined" && "DeviceOrientationEvent" in window;
 
+		let sensorsAttached = false;
+		const detachSensors = () => {
+			window.removeEventListener("devicemotion", handleMotion);
+			window.removeEventListener("deviceorientation", handleOrientation);
+			sensorsAttached = false;
+		};
+
+		/**
+		 * Pasang listener sensor setelah izin iOS (jika perlu).
+		 * Izin ditolak/gagal → fail-closed: ANOMALY_DETECTED (bukan
+		 * diam-diam melewatkan verifikasi).
+		 */
+		const attachSensorsWithPermission = async () => {
+			const granted = await requestMotionPermission();
+			if (!granted) {
+				if (!simulateModeRef.current && !anomalyRef.current) {
+					anomalyRef.current = true;
+					setReason(
+						"Izin sensor gerak (motion) ditolak — tidak dapat memverifikasi pergerakan fisik",
+					);
+					setStatus("ANOMALY_DETECTED");
+					onAnomalyRef.current?.(
+						"Izin sensor gerak ditolak — indikasi emulator/fake environment",
+					);
+				}
+				return;
+			}
+			if (anomalyRef.current || sensorsAttached) return;
+			if (hasMotion)
+				window.addEventListener("devicemotion", handleMotion, {
+					passive: true,
+				});
+			if (hasOrientation)
+				window.addEventListener("deviceorientation", handleOrientation, {
+					passive: true,
+				});
+			sensorsAttached = true;
+		};
+
 		const unregisterCleanup = registerTelemetryResource(() => {
 			// Fallback jika cleanupTelemetry() global dijalankan duluan:
 			// handler di-scope di sini dan dilepas manual.
-			window.removeEventListener("devicemotion", handleMotion);
-			window.removeEventListener("deviceorientation", handleOrientation);
+			detachSensors();
 		});
 
 		// Handler motion — ringan: hanya push ke ref + throttle evaluate
@@ -239,12 +313,8 @@ export function useSilentWatchdog({
 			if (headingRef.current.length > 240) headingRef.current.shift();
 		};
 
-		if (hasMotion)
-			window.addEventListener("devicemotion", handleMotion, { passive: true });
-		if (hasOrientation)
-			window.addEventListener("deviceorientation", handleOrientation, {
-				passive: true,
-			});
+		if (hasMotion || hasOrientation)
+			void attachSensorsWithPermission();
 
 		// Tanpa sensor motion sama sekali → anomali langsung (tidak sinkron)
 		// (diabaikan pada mode simulasi desktop/e2e)
@@ -288,8 +358,7 @@ export function useSilentWatchdog({
 		});
 
 		return () => {
-			window.removeEventListener("devicemotion", handleMotion);
-			window.removeEventListener("deviceorientation", handleOrientation);
+			detachSensors();
 			clearInterval(uiTick);
 			clearTimeout(stopTimer);
 			unregisterCleanup();
