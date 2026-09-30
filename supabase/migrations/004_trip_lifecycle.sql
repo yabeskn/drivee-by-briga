@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS brigacoin_transactions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE brigacoin_transactions ADD COLUMN IF NOT EXISTS trip_id UUID REFERENCES trips(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_brigacoin_driver_id ON brigacoin_transactions(driver_id);
 CREATE INDEX IF NOT EXISTS idx_brigacoin_trip_id ON brigacoin_transactions(trip_id);
 

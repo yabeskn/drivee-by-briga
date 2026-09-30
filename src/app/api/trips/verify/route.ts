@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { supabaseAdmin, isAdminConfigured } from '@/lib/supabase/server';
-import { addBalance } from '@/lib/brigacoin/balance';
+import { addBalance, awardBrigaCoins } from '@/lib/brigacoin/balance';
 import { canonicalJSON } from '@/lib/trip-hasher';
 
 // ── Types ───────────────────────────────────────────────────
@@ -577,30 +577,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const currentAvg = Number(driverRecord?.average_eco_score) || 0;
       const newAvg = Math.round(((currentAvg * (totalTrips - 1) + data.eco_score) / totalTrips) * 10) / 10;
 
-      // Update drivers table
+      // Update drivers profile stats (streak, total_trips, average_eco_score)
       await supabaseAdmin
         .from('drivers')
         .update({
           current_streak: newStreak,
           total_trips: totalTrips,
-          briga_coin_balance: newBalance,
           average_eco_score: newAvg,
           updated_at: new Date().toISOString(),
         })
         .eq('id', validDriverId);
 
-      // Insert entry into brigacoin_transactions
-      await supabaseAdmin
-        .from('brigacoin_transactions')
-        .insert({
-          driver_id: validDriverId,
-          type: 'earn',
-          amount: tokensEarned,
-          balance_after: newBalance,
-          source: 'trip_verification',
-          reference_id: data.trip_id,
-          description: 'Trip verification reward',
-        });
+      // Award tokens via Unified BrigaCoin (atomic, idempotent, server-authoritative)
+      await awardBrigaCoins(
+        validDriverId,
+        tokensEarned,
+        'trip',
+        `Trip verification reward (${data.distance_km} km, Eco: ${data.eco_score})`,
+        data.trip_id,
+        {
+          idempotencyKey: `award:${data.trip_id}`,
+          actor: 'drifee',
+          userId: validDriverId,
+        }
+      );
 
       // Upsert into trips table
       if (validVehicleId) {
