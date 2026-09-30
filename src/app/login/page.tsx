@@ -2,23 +2,42 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { SessionProvider, useSession } from 'next-auth/react';
+import { supabase } from '@/lib/supabase/client';
 import { SupabaseSignInButton } from '@/components/SupabaseSignInButton';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 
 function LoginContent() {
   const router = useRouter();
-  const { status } = useSession();
   const [phone, setPhone] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
-    if (status === 'authenticated') {
+    const isLoggedIn = localStorage.getItem('drivee_logged_in') === 'true';
+    if (isLoggedIn) {
       router.replace('/go');
+      return;
     }
-  }, [status, router]);
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        localStorage.setItem('drivee_logged_in', 'true');
+        router.replace('/go');
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        localStorage.setItem('drivee_logged_in', 'true');
+        router.replace('/go');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [router]);
 
   const handleSendVerification = async () => {
     if (!phone) return;
@@ -119,9 +138,7 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <LanguageProvider>
-      <SessionProvider>
-        <LoginContent />
-      </SessionProvider>
+      <LoginContent />
     </LanguageProvider>
   );
 }

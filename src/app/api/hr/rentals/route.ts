@@ -15,7 +15,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const orderId = searchParams.get('orderId');
 
     if (orderId) {
-      const order = getRentalOrderById(orderId);
+      const order = await getRentalOrderById(orderId);
       if (!order) {
         return NextResponse.json(
           { success: false, error: 'Order not found' },
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const orders = getRentalOrders(companyId);
+    const orders = await getRentalOrders(companyId);
     return NextResponse.json({ success: true, data: orders });
   } catch (error) {
     console.error('[API] HR rentals error:', error);
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const result = createRentalOrder(
+    const result = await createRentalOrder(
       companyId,
       packageId,
       vehicleId,

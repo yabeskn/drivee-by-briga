@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBalance, getTransactions } from '@/lib/brigacoin/balance';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
@@ -13,8 +15,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const balance = getBalance(driverId);
-    const transactions = getTransactions(driverId);
+    const balance = await getBalance(driverId);
+    const transactions = await getTransactions(driverId);
 
     return NextResponse.json({
       success: true,

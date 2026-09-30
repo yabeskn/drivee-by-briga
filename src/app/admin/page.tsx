@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase/client';
 import {
   MapPin,
   CheckCircle2,
@@ -143,17 +145,60 @@ const MOCK_RAW_GPS: [number, number][] = [
 ];
 
 export default function AdminDashboard() {
+  const [tripList, setTripList] = useState(MOCK_VERIFIED_TRIPS);
   const [selectedTrip, setSelectedTrip] = useState(MOCK_VERIFIED_TRIPS[0]);
 
+  useEffect(() => {
+    async function loadTrips() {
+      try {
+        const { data } = await supabase
+          .from('trips')
+          .select('*, drivers(name), vehicles(brand, model, license_plate)')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (data && data.length > 0) {
+          const mapped = data.map((t: any) => ({
+            trip_id: t.id,
+            driver_name: t.drivers?.name || 'Driver Shuttle',
+            vehicle: t.vehicles ? `${t.vehicles.brand} ${t.vehicles.model} (${t.vehicles.license_plate})` : 'EV Unit',
+            profile: t.profile_used || 'URBAN_NORMAL',
+            distance_km: Number(t.distance_km) || 0,
+            eco_score: t.eco_score || 0,
+            eco_grade: (t.eco_grade || 'A') as any,
+            tokens: t.tokens_earned || 0,
+            co2_avoided_kg: Number(t.co2_avoided_kg) || Number(((Number(t.distance_km) || 0) * 0.12).toFixed(2)),
+            duration_min: Math.round(Number(t.idle_duration_seconds || 0) / 60) || 45,
+            status: (t.verification_status === 'verified' ? 'VERIFIED' : 'REJECTED') as any,
+            start_time: t.start_time,
+            verification: {
+              hash_match: true,
+              physics_check: true,
+              osrm_processed: true,
+              gaps_detected: 0,
+              confidence: 0.95,
+              matched_distance_km: Number(t.distance_km) || 0,
+            },
+          }));
+          setTripList(mapped);
+          setSelectedTrip(mapped[0]);
+        }
+      } catch (err) {
+        console.warn('Failed to load trips from Supabase:', err);
+      }
+    }
+    loadTrips();
+  }, []);
+
   // Fleet aggregates
-  const totalTrips = MOCK_VERIFIED_TRIPS.length;
-  const totalVerified = MOCK_VERIFIED_TRIPS.filter((t) => t.status === 'VERIFIED').length;
-  const totalDistanceKm = MOCK_VERIFIED_TRIPS.reduce((s, t) => s + t.distance_km, 0);
-  const totalCO2 = MOCK_VERIFIED_TRIPS.reduce((s, t) => s + t.co2_avoided_kg, 0);
-  const avgEcoScore = Math.round(
-    MOCK_VERIFIED_TRIPS.reduce((s, t) => s + t.eco_score, 0) / totalTrips,
-  );
-  const totalTokens = MOCK_VERIFIED_TRIPS.reduce((s, t) => s + t.tokens, 0);
+  const totalTrips = tripList.length;
+  const totalVerified = tripList.filter((t) => t.status === 'VERIFIED').length;
+  const totalDistanceKm = tripList.reduce((s, t) => s + t.distance_km, 0);
+  const totalCO2 = tripList.reduce((s, t) => s + t.co2_avoided_kg, 0);
+  const avgEcoScore = totalTrips > 0
+    ? Math.round(tripList.reduce((s, t) => s + t.eco_score, 0) / totalTrips)
+    : 0;
+  const totalTokens = tripList.reduce((s, t) => s + t.tokens, 0);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-8">
@@ -176,9 +221,17 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
-          <span className="text-xs font-mono text-zinc-500">
-            {new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
-          </span>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/company"
+              className="text-xs px-3 py-1.5 bg-emerald-950 border border-emerald-800 text-emerald-400 hover:bg-emerald-900/50 rounded-lg font-mono transition-colors"
+            >
+              ESG Portal →
+            </Link>
+            <span className="text-xs font-mono text-zinc-500">
+              {new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
+            </span>
+          </div>
         </div>
 
         {/* KPI Cards Row */}
@@ -216,7 +269,7 @@ export default function AdminDashboard() {
             </h2>
 
             <div className="space-y-2">
-              {MOCK_VERIFIED_TRIPS.map((trip) => (
+              {tripList.map((trip) => (
                 <button
                   key={trip.trip_id}
                   onClick={() => setSelectedTrip(trip)}

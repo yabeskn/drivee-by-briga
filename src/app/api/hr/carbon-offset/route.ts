@@ -13,7 +13,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const offsets = getCarbonOffsets(companyId);
+    const offsets = await getCarbonOffsets(companyId);
 
     return NextResponse.json({
       success: true,
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const result = buyCarbonOffset(companyId, amountKg, type);
+    const result = await buyCarbonOffset(companyId, amountKg, type);
 
     if (!result.success) {
       return NextResponse.json(

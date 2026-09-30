@@ -51,14 +51,14 @@ Call log:
   2  | 
   3  | test.describe('Phone Verification', () => {
   4  |   test('should show phone input and send button', async ({ page }) => {
-  5  |     await page.goto('/login', { timeout: 10000 });
+  5  |     await page.goto('/login');
   6  |     await expect(page.locator('input[type="tel"]')).toBeVisible({ timeout: 5000 });
 > 7  |     await expect(page.locator('text=Kirim Link Verifikasi')).toBeVisible({ timeout: 5000 });
      |                                                              ^ Error: expect(locator).toBeVisible() failed
   8  |   });
   9  | 
   10 |   test('should accept valid phone number', async ({ page }) => {
-  11 |     await page.goto('/login', { timeout: 10000 });
+  11 |     await page.goto('/login');
   12 |     await page.fill('input[type="tel"]', '081234567890');
   13 |     await page.click('text=Kirim Link Verifikasi');
   14 |     await expect(page.locator('text=Link verifikasi terkirim')).toBeVisible({ timeout: 5000 });

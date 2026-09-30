@@ -13,6 +13,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
+import { supabaseAdmin, isAdminConfigured } from '@/lib/supabase/server';
+import { addBalance } from '@/lib/brigacoin/balance';
 
 // ── Types ───────────────────────────────────────────────────
 interface TripVerifyRequest {
@@ -423,6 +425,74 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
       message: 'Trip verified and tokens awarded',
     };
+
+    // ── WS4: Persist verified trip to Supabase and credit BrigaCoins ──
+    if (isAdminConfigured()) {
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const validDriverId = isUuid.test(data.driver_id) ? data.driver_id : null;
+        const validVehicleId = isUuid.test(data.vehicle_id) ? data.vehicle_id : null;
+
+        if (validDriverId && validVehicleId) {
+          await supabaseAdmin.from('trips').insert({
+            driver_id: validDriverId,
+            vehicle_id: validVehicleId,
+            start_time: data.start_time,
+            end_time: data.end_time,
+            distance_km: data.distance_km,
+            eco_score: data.eco_score,
+            eco_grade: data.eco_grade || 'A',
+            tokens_earned: tokenBreakdown.total_reward,
+            trip_hash: data.trip_hash,
+            verification_status: 'verified',
+            profile_used: data.profile_used,
+            start_battery_soc: data.start_battery_soc,
+            end_battery_soc: data.end_battery_soc,
+            energy_used_kwh: data.energy_used_kwh,
+            harsh_accelerations: data.telemetry_summary.harsh_accelerations,
+            harsh_brakings: data.telemetry_summary.harsh_brakings,
+            idle_duration_seconds: data.telemetry_summary.idle_duration_seconds,
+            avg_speed_kmh: data.telemetry_summary.average_speed_kmh,
+            max_speed_kmh: data.telemetry_summary.max_speed_kmh,
+          });
+
+          // Credit BrigaCoins
+          await addBalance(
+            validDriverId,
+            tokenBreakdown.total_reward,
+            'trip',
+            `Trip reward (${data.distance_km} km, Eco Score ${data.eco_score})`,
+            data.trip_id
+          );
+
+          // Update driver streak & stats
+          const { data: driver } = await supabaseAdmin
+            .from('drivers')
+            .select('total_trips, current_streak, average_eco_score')
+            .eq('id', validDriverId)
+            .single();
+
+          if (driver) {
+            const newTotal = (driver.total_trips || 0) + 1;
+            const newStreak = data.eco_score >= 85 ? (driver.current_streak || 0) + 1 : 0;
+            const currentAvg = Number(driver.average_eco_score) || 0;
+            const newAvg = Math.round(((currentAvg * (newTotal - 1) + data.eco_score) / newTotal) * 10) / 10;
+
+            await supabaseAdmin
+              .from('drivers')
+              .update({
+                total_trips: newTotal,
+                current_streak: newStreak,
+                average_eco_score: newAvg,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', validDriverId);
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[API] Non-critical: Failed to save trip to Supabase:', dbErr);
+      }
+    }
 
     return NextResponse.json(response, { status: 200 });
 

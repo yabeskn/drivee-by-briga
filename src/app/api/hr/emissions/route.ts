@@ -13,7 +13,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const emissions = getEmissions(companyId);
+    const emissions = await getEmissions(companyId);
 
     // Calculate totals
     const totalEmission = emissions.reduce((sum, e) => sum + e.totalEmissionKg, 0);
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const emission = trackEmission(companyId, rentalId, distanceKm, category);
+    const emission = await trackEmission(companyId, rentalId, distanceKm, category);
 
     return NextResponse.json({
       success: true,

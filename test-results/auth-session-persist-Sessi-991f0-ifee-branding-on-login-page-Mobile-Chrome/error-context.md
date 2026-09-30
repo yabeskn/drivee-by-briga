@@ -62,13 +62,13 @@ Call log:
   2  | 
   3  | test.describe('Session Persistence', () => {
   4  |   test('should show Drifee branding on login page', async ({ page }) => {
-  5  |     await page.goto('/login', { timeout: 10000 });
+  5  |     await page.goto('/login');
 > 6  |     await expect(page.locator('text=Drifee')).toBeVisible({ timeout: 5000 });
      |                                               ^ Error: expect(locator).toBeVisible() failed
   7  |   });
   8  | 
   9  |   test('should show login page elements', async ({ page }) => {
-  10 |     await page.goto('/login', { timeout: 10000 });
+  10 |     await page.goto('/login');
   11 |     await expect(page.locator('text=Sign in with Google')).toBeVisible({ timeout: 5000 });
   12 |     await expect(page.locator('text=Verifikasi Nomor HP')).toBeVisible({ timeout: 5000 });
   13 |   });

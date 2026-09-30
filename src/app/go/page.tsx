@@ -12,6 +12,7 @@ import { EVVehicle, TripRecord, PhotoEvidence } from '@/types/telematics';
 import { TelematicsState } from '@/hooks/useTelematics';
 import { registerServiceWorker, skipWaiting } from '@/lib/sw-register';
 import { setupAutoSync } from '@/lib/sync/engine';
+import { supabase } from '@/lib/supabase/client';
 
 function GoApp() {
   const router = useRouter();
@@ -147,11 +148,46 @@ export default function GoPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('drivee_logged_in') === 'true';
-    if (isLoggedIn) {
-      setIsAuthorized(true);
-    }
-    setIsLoading(false);
+    let mounted = true;
+
+    const checkAuth = async () => {
+      const isLoggedIn = localStorage.getItem('drivee_logged_in') === 'true';
+      if (isLoggedIn) {
+        if (mounted) {
+          setIsAuthorized(true);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && mounted) {
+          localStorage.setItem('drivee_logged_in', 'true');
+          setIsAuthorized(true);
+        }
+      } catch (err) {
+        console.warn('Auth check error:', err);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && mounted) {
+        localStorage.setItem('drivee_logged_in', 'true');
+        setIsAuthorized(true);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (isLoading) {

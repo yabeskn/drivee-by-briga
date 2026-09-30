@@ -13,7 +13,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const redemptions = getRedemptions(driverId);
+    const redemptions = await getRedemptions(driverId);
 
     return NextResponse.json({
       success: true,

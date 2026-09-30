@@ -39,7 +39,7 @@ Call log:
   2 | 
   3 | test.describe('Active Driving HUD', () => {
   4 |   test('should show HUD elements or empty state', async ({ page }) => {
-  5 |     await page.goto('/go', { timeout: 10000 });
+  5 |     await page.goto('/go');
 > 6 |     await expect(page.locator('text=Tidak Ada Data Perjalanan')).toBeVisible({ timeout: 5000 });
     |                                                                  ^ Error: expect(locator).toBeVisible() failed
   7 |   });

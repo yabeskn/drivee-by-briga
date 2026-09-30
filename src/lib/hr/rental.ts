@@ -1,4 +1,9 @@
 import { RentalOrder, Scope3Emission, CarbonOffset, VehicleCategory } from '@/types/telematics';
+import { supabaseAdmin, isAdminConfigured } from '@/lib/supabase/server';
+
+function useSupabase(): boolean {
+  return isAdminConfigured();
+}
 
 // ── Rental Packages ─────────────────────────────────────────
 
@@ -111,25 +116,74 @@ export function calculateMonthlyEmission(
   return { totalEmissionKg, offsetCost, brcEarned };
 }
 
-// ── Rental Order Management ─────────────────────────────────
+// ── Fallback In-Memory Stores ────────────────────────────────
 
 const rentalStore = new Map<string, RentalOrder>();
 const emissionStore = new Map<string, Scope3Emission[]>();
 const carbonOffsetStore = new Map<string, CarbonOffset[]>();
 
-export function createRentalOrder(
+// ── Rental Order Management ─────────────────────────────────
+
+export async function createRentalOrder(
   companyId: string,
   packageId: string,
   vehicleId: string,
   driverId: string,
   startDate: Date,
   endDate: Date
-): { success: boolean; order?: RentalOrder; error?: string } {
+): Promise<{ success: boolean; order?: RentalOrder; error?: string }> {
   const pkg = rentalPackages.find((p) => p.id === packageId);
   if (!pkg) {
     return { success: false, error: 'Invalid package' };
   }
 
+  const paymentRef = `INV-${Date.now()}`;
+
+  if (useSupabase()) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('hr_rentals')
+        .insert({
+          company_id: companyId,
+          package_type: packageId,
+          vehicle_id: vehicleId,
+          driver_id: driverId,
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          total_price: pkg.price,
+          payment_status: 'pending',
+          payment_reference: paymentRef,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[HR Rental] Supabase insert error:', error);
+      } else if (data) {
+        return {
+          success: true,
+          order: {
+            id: data.id,
+            companyId: data.company_id,
+            packageType: data.package_type as RentalOrder['packageType'],
+            vehicleId: data.vehicle_id,
+            driverId: data.driver_id,
+            startDate: new Date(data.start_date),
+            endDate: new Date(data.end_date),
+            totalPrice: data.total_price,
+            paymentStatus: data.payment_status as RentalOrder['paymentStatus'],
+            paymentMethod: 'transfer',
+            paymentReference: data.payment_reference,
+            createdAt: new Date(data.created_at),
+          },
+        };
+      }
+    } catch (e) {
+      console.warn('[HR Rental] Falling back to memory store:', e);
+    }
+  }
+
+  // Fallback
   const order: RentalOrder = {
     id: `rnt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
     companyId,
@@ -141,7 +195,7 @@ export function createRentalOrder(
     totalPrice: pkg.price,
     paymentStatus: 'pending',
     paymentMethod: 'transfer',
-    paymentReference: `INV-${Date.now()}`,
+    paymentReference: paymentRef,
     createdAt: new Date(),
   };
 
@@ -149,18 +203,94 @@ export function createRentalOrder(
   return { success: true, order };
 }
 
-export function getRentalOrders(companyId: string): RentalOrder[] {
+export async function getRentalOrders(companyId: string): Promise<RentalOrder[]> {
+  if (useSupabase()) {
+    const { data } = await supabaseAdmin
+      .from('hr_rentals')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      return data.map((d) => ({
+        id: d.id,
+        companyId: d.company_id,
+        packageType: d.package_type as RentalOrder['packageType'],
+        vehicleId: d.vehicle_id,
+        driverId: d.driver_id,
+        startDate: new Date(d.start_date),
+        endDate: new Date(d.end_date),
+        totalPrice: d.total_price,
+        paymentStatus: d.payment_status as RentalOrder['paymentStatus'],
+        paymentMethod: 'transfer',
+        paymentReference: d.payment_reference,
+        createdAt: new Date(d.created_at),
+      }));
+    }
+  }
+
   return Array.from(rentalStore.values()).filter((r) => r.companyId === companyId);
 }
 
-export function getRentalOrderById(id: string): RentalOrder | undefined {
+export async function getRentalOrderById(id: string): Promise<RentalOrder | undefined> {
+  if (useSupabase()) {
+    const { data } = await supabaseAdmin
+      .from('hr_rentals')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (data) {
+      return {
+        id: data.id,
+        companyId: data.company_id,
+        packageType: data.package_type as RentalOrder['packageType'],
+        vehicleId: data.vehicle_id,
+        driverId: data.driver_id,
+        startDate: new Date(data.start_date),
+        endDate: new Date(data.end_date),
+        totalPrice: data.total_price,
+        paymentStatus: data.payment_status as RentalOrder['paymentStatus'],
+        paymentMethod: 'transfer',
+        paymentReference: data.payment_reference,
+        createdAt: new Date(data.created_at),
+      };
+    }
+  }
+
   return rentalStore.get(id);
 }
 
-export function updatePaymentStatus(
+export async function updatePaymentStatus(
   orderId: string,
   status: RentalOrder['paymentStatus']
-): RentalOrder | undefined {
+): Promise<RentalOrder | undefined> {
+  if (useSupabase()) {
+    const { data } = await supabaseAdmin
+      .from('hr_rentals')
+      .update({ payment_status: status })
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (data) {
+      return {
+        id: data.id,
+        companyId: data.company_id,
+        packageType: data.package_type as RentalOrder['packageType'],
+        vehicleId: data.vehicle_id,
+        driverId: data.driver_id,
+        startDate: new Date(data.start_date),
+        endDate: new Date(data.end_date),
+        totalPrice: data.total_price,
+        paymentStatus: data.payment_status as RentalOrder['paymentStatus'],
+        paymentMethod: 'transfer',
+        paymentReference: data.payment_reference,
+        createdAt: new Date(data.created_at),
+      };
+    }
+  }
+
   const order = rentalStore.get(orderId);
   if (!order) return undefined;
   order.paymentStatus = status;
@@ -170,16 +300,51 @@ export function updatePaymentStatus(
 
 // ── Scope 3 Emission Tracking ───────────────────────────────
 
-export function trackEmission(
+export async function trackEmission(
   companyId: string,
   rentalId: string,
   distanceKm: number,
   category: Scope3Emission['category']
-): Scope3Emission {
-  const pkg = rentalPackages.find(
-    (p) => p.id === rentalStore.get(rentalId)?.packageType
-  );
+): Promise<Scope3Emission> {
+  const rental = await getRentalOrderById(rentalId);
+  const pkg = rentalPackages.find((p) => p.id === rental?.packageType);
   const emissionFactor = pkg?.emissionFactor || 0.12;
+  const totalEmissionKg = calculateEmission(distanceKm, emissionFactor);
+
+  if (useSupabase()) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('scope3_emissions')
+        .insert({
+          company_id: companyId,
+          rental_id: rentalId,
+          category,
+          distance_km: distanceKm,
+          emission_factor: emissionFactor,
+          total_emission_kg: totalEmissionKg,
+        })
+        .select()
+        .single();
+
+      if (data) {
+        return {
+          id: data.id,
+          companyId: data.company_id,
+          rentalId: data.rental_id,
+          category: data.category as Scope3Emission['category'],
+          distanceKm: data.distance_km,
+          emissionFactor: data.emission_factor,
+          totalEmissionKg: data.total_emission_kg,
+          offsetKg: 0,
+          netEmissionKg: data.total_emission_kg,
+          brcEarned: 0,
+          createdAt: new Date(data.created_at),
+        };
+      }
+    } catch (e) {
+      console.warn('[HR Emission] Supabase insert failed, using fallback:', e);
+    }
+  }
 
   const emission: Scope3Emission = {
     id: `emi_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -188,9 +353,9 @@ export function trackEmission(
     category,
     distanceKm,
     emissionFactor,
-    totalEmissionKg: calculateEmission(distanceKm, emissionFactor),
+    totalEmissionKg,
     offsetKg: 0,
-    netEmissionKg: calculateEmission(distanceKm, emissionFactor),
+    netEmissionKg: totalEmissionKg,
     brcEarned: 0,
     createdAt: new Date(),
   };
@@ -202,21 +367,79 @@ export function trackEmission(
   return emission;
 }
 
-export function getEmissions(companyId: string): Scope3Emission[] {
+export async function getEmissions(companyId: string): Promise<Scope3Emission[]> {
+  if (useSupabase()) {
+    const { data } = await supabaseAdmin
+      .from('scope3_emissions')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      return data.map((d) => ({
+        id: d.id,
+        companyId: d.company_id,
+        rentalId: d.rental_id,
+        category: d.category as Scope3Emission['category'],
+        distanceKm: d.distance_km,
+        emissionFactor: d.emission_factor,
+        totalEmissionKg: d.total_emission_kg,
+        offsetKg: 0,
+        netEmissionKg: d.total_emission_kg,
+        brcEarned: 0,
+        createdAt: new Date(d.created_at),
+      }));
+    }
+  }
+
   return emissionStore.get(companyId) || [];
 }
 
 // ── Carbon Offset ───────────────────────────────────────────
 
-export function buyCarbonOffset(
+export async function buyCarbonOffset(
   companyId: string,
   amountKg: number,
   type: CarbonOffset['type']
-): { success: boolean; offset?: CarbonOffset; error?: string } {
+): Promise<{ success: boolean; offset?: CarbonOffset; error?: string }> {
   // Cost: Rp 50K per ton CO₂
   const cost = (amountKg / 1000) * 50_000;
   // BRC earned: 500 BRC per ton CO₂
   const brcEarned = (amountKg / 1000) * 500;
+
+  if (useSupabase()) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('carbon_offsets')
+        .insert({
+          company_id: companyId,
+          amount_kg: amountKg,
+          type,
+          cost,
+          brc_earned: brcEarned,
+          certificate_url: null,
+        })
+        .select()
+        .single();
+
+      if (data) {
+        return {
+          success: true,
+          offset: {
+            id: data.id,
+            companyId: data.company_id,
+            amountKg: data.amount_kg,
+            type: data.type as CarbonOffset['type'],
+            cost: data.cost,
+            brcEarned: data.brc_earned,
+            createdAt: new Date(data.created_at),
+          },
+        };
+      }
+    } catch (e) {
+      console.warn('[Carbon Offset] Supabase insert failed, using fallback:', e);
+    }
+  }
 
   const offset: CarbonOffset = {
     id: `ofs_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -235,6 +458,26 @@ export function buyCarbonOffset(
   return { success: true, offset };
 }
 
-export function getCarbonOffsets(companyId: string): CarbonOffset[] {
+export async function getCarbonOffsets(companyId: string): Promise<CarbonOffset[]> {
+  if (useSupabase()) {
+    const { data } = await supabaseAdmin
+      .from('carbon_offsets')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      return data.map((d) => ({
+        id: d.id,
+        companyId: d.company_id,
+        amountKg: d.amount_kg,
+        type: d.type as CarbonOffset['type'],
+        cost: d.cost,
+        brcEarned: d.brc_earned,
+        createdAt: new Date(d.created_at),
+      }));
+    }
+  }
+
   return carbonOffsetStore.get(companyId) || [];
 }

@@ -62,18 +62,18 @@ Call log:
   2  | 
   3  | test.describe('Google Sign-In', () => {
   4  |   test('should show login page with Google Sign-In button', async ({ page }) => {
-  5  |     await page.goto('/login', { timeout: 10000 });
+  5  |     await page.goto('/login');
 > 6  |     await expect(page.locator('text=Sign in with Google')).toBeVisible({ timeout: 5000 });
      |                                                            ^ Error: expect(locator).toBeVisible() failed
   7  |   });
   8  | 
   9  |   test('should show phone verification section', async ({ page }) => {
-  10 |     await page.goto('/login', { timeout: 10000 });
+  10 |     await page.goto('/login');
   11 |     await expect(page.locator('text=Verifikasi Nomor HP')).toBeVisible({ timeout: 5000 });
   12 |   });
   13 | 
   14 |   test('should have phone input field', async ({ page }) => {
-  15 |     await page.goto('/login', { timeout: 10000 });
+  15 |     await page.goto('/login');
   16 |     await expect(page.locator('input[type="tel"]')).toBeVisible({ timeout: 5000 });
   17 |   });
   18 | });
