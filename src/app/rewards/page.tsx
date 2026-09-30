@@ -47,7 +47,7 @@ export default function RewardsPage() {
 
   const fetchBalance = async () => {
     try {
-      const driverId = localStorage.getItem('drivee_driver_id') || 'drv_default';
+      const driverId = localStorage.getItem('drifee_driver_id') || localStorage.getItem('drivee_driver_id') || 'drv_default';
       const res = await fetch(`/api/brigacoin/balance?driverId=${driverId}`);
       const data = await res.json();
       if (data.success) {
@@ -63,7 +63,7 @@ export default function RewardsPage() {
     setMessage(null);
 
     try {
-      const driverId = localStorage.getItem('drivee_driver_id') || 'drv_default';
+      const driverId = localStorage.getItem('drifee_driver_id') || localStorage.getItem('drivee_driver_id') || 'drv_default';
       const res = await fetch('/api/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

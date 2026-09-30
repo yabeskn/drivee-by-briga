@@ -1,36 +1,39 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { getBalance } from '@/lib/brigacoin/balance';
+import { supabaseAdmin, isAdminConfigured } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
     const user = await requireAuth();
+    const balance = await getBalance(user.id);
 
-    const driver = await db.tripSessions
-      .where('driverId')
-      .equals(user.id)
-      .first();
+    let currentStreak = 0;
+    let totalTrips = 0;
+    let averageScore = 0;
 
-    // Calculate total rewards from all completed trips
-    const trips = await db.tripSessions
-      .where('driverId')
-      .equals(user.id)
-      .filter(t => t.status === 'completed')
-      .toArray();
+    if (isAdminConfigured()) {
+      const { data: driver } = await supabaseAdmin
+        .from('drivers')
+        .select('current_streak, total_trips, average_eco_score')
+        .eq('id', user.id)
+        .single();
 
-    const totalRewards = trips.reduce((sum, t) => sum + (t.totalPoints || 0), 0);
-    // TripSession tidak menyimpan streak — streak dihitung dari profil driver (server), bukan sesi lokal
-    const currentStreak = 0;
+      if (driver) {
+        currentStreak = driver.current_streak || 0;
+        totalTrips = driver.total_trips || 0;
+        averageScore = Number(driver.average_eco_score || 0);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       data: {
-        totalRewards,
+        totalRewards: balance.balance,
         currentStreak,
-        totalTrips: trips.length,
-        averageScore: trips.length > 0
-          ? Math.round(trips.reduce((sum, t) => sum + (t.totalPoints || 0), 0) / trips.length)
-          : 0,
+        totalTrips,
+        averageScore,
+        balance,
       },
     });
   } catch (error) {
