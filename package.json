@@ -6,7 +6,8 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "husky": "^9.1.7",
-    "lint-staged": "^17.6.0"
+    "lint-staged": "^17.6.0",
+    "vitest": "^5.0.3"
   },
   "dependencies": {
     "@prisma/client": "^7.10.0",
@@ -34,6 +35,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepare": "husky"
   }
 }
