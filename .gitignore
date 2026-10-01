@@ -18,6 +18,8 @@
 # Misc
 .DS_Store
 *.pem
+/reports/
+*.csv
 
 # Debug
 npm-debug.log*

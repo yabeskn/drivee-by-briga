@@ -39,6 +39,7 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
+    "report:payout": "node scripts/daily-payout-reporter.mjs",
     "prepare": "husky"
   }
 }

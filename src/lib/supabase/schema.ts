@@ -22,6 +22,9 @@ export interface Database {
 					total_trips: number;
 					average_eco_score: number;
 					role: string;
+					bank_name?: string | null;
+					bank_account_number?: string | null;
+					bank_account_holder?: string | null;
 					created_at: string;
 					updated_at: string;
 				};
@@ -38,6 +41,9 @@ export interface Database {
 					total_trips?: number;
 					average_eco_score?: number;
 					role?: string;
+					bank_name?: string | null;
+					bank_account_number?: string | null;
+					bank_account_holder?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -54,6 +60,9 @@ export interface Database {
 					total_trips?: number;
 					average_eco_score?: number;
 					role?: string;
+					bank_name?: string | null;
+					bank_account_number?: string | null;
+					bank_account_holder?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				};

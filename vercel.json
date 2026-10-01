@@ -4,6 +4,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "regions": ["sin1"],
+  "crons": [
+    {
+      "path": "/api/cron/daily-driver-payout",
+      "schedule": "0 16 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
