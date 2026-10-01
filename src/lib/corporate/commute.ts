@@ -11,10 +11,11 @@
 
 import { supabaseAdmin, isAdminConfigured } from '@/lib/supabase/server';
 import { awardBrigaCoins, spendBalance, BRC_TO_IDR } from '@/lib/brigacoin/balance';
-import type { CorporateProfile, CorporateAllowance, CorporateEmissionLog } from '@/types/telematics';
+import type { CorporateProfile, CorporateAllowance, CorporateEmissionLog, TripFinancialSplit } from '@/types/telematics';
 
 export const MIN_COMMUTE_ALLOWANCE_BRC = 5; // Minimal Rp 25.000 per karyawan
 export const EV_CAR_CO2_SAVED_PER_KM = 0.137; // kg CO2 avoided vs ICE car (0.192 - 0.055)
+export const DEFAULT_STANDARD_PLATFORM_FEE_RATE = 0.15; // 15% Platform fee standar
 
 // In-Memory store for tests and fallback
 const memCorporateProfiles = new Map<string, CorporateProfile>();
@@ -327,6 +328,63 @@ export function calculateCommuteFareDiscount(
 }
 
 /**
+ * Kalkulasi bagi hasil finansial berbasis Platform Fee Absorption
+ * di mana diskon voucher BRC penumpang diserap dari platform fee,
+ * menjamin pendapatan bersih pengemudi terlindungi 100%.
+ */
+export function calculateTripFinancialSplit(params: {
+  grossFareIdr: number;
+  coinsToSpend: number;
+  standardFeeRate?: number;
+  corporateName?: string;
+}): TripFinancialSplit {
+  const {
+    grossFareIdr,
+    coinsToSpend,
+    standardFeeRate = DEFAULT_STANDARD_PLATFORM_FEE_RATE,
+    corporateName,
+  } = params;
+
+  const validGross = Math.max(0, grossFareIdr);
+  const validCoins = Math.max(0, coinsToSpend);
+
+  // Nilai subsidi koin (1 BRC = Rp 5.000)
+  const rawSubsidyIdr = validCoins * BRC_TO_IDR;
+  // Subsidi tidak boleh melebihi tarif kotor perjalanan
+  const effectiveSubsidyIdr = Math.min(rawSubsidyIdr, validGross);
+  const actualCoinsUsed = Math.ceil(effectiveSubsidyIdr / BRC_TO_IDR);
+
+  // Pembayaran tunai/e-wallet aktual dari penumpang
+  const passengerPaidIdr = Math.max(0, validGross - effectiveSubsidyIdr);
+
+  // Biaya platform normal sebelum subsidi (misal 15%)
+  const standardPlatformFeeIdr = Math.round(validGross * standardFeeRate);
+
+  // ATURAN PROTEKSI PENGEMUDI (Platform Fee Absorption):
+  // Subsidi voucher BRC penumpang diserap pertama kali dari jatah platform fee
+  const platformSubsidyAbsorbedIdr = Math.min(effectiveSubsidyIdr, standardPlatformFeeIdr);
+  const effectivePlatformFeeIdr = Math.max(0, standardPlatformFeeIdr - platformSubsidyAbsorbedIdr);
+
+  // Payout bersih driver selalu terlindungi penuh:
+  // Driver menerima tarif kotor dikurangi biaya platform efektif
+  const driverNetPayoutIdr = validGross - effectivePlatformFeeIdr;
+
+  return {
+    grossFareIdr: validGross,
+    passengerPaidIdr,
+    brcSubsidyIdr: effectiveSubsidyIdr,
+    brcCoinsUsed: actualCoinsUsed,
+    standardPlatformFeeRate: standardFeeRate,
+    standardPlatformFeeIdr,
+    platformSubsidyAbsorbedIdr,
+    effectivePlatformFeeIdr,
+    driverNetPayoutIdr,
+    driverEarningsProtected: true,
+    corporateSponsor: corporateName,
+  };
+}
+
+/**
  * Catat penyelesaian perjalanan komuter hijau dan deduksi koin secara atomik
  */
 export async function recordCorporateCommuteTrip(params: {
@@ -341,10 +399,19 @@ export async function recordCorporateCommuteTrip(params: {
   success: boolean;
   co2SavedKg: number;
   netFareIdr: number;
+  financialSplit: TripFinancialSplit;
   error?: string;
 }> {
   const { userId, userEmail, tripId, distanceKm, brcSpent, fareIdr, corporateId } = params;
   const co2SavedKg = Number((distanceKm * EV_CAR_CO2_SAVED_PER_KM).toFixed(2));
+  const targetCorpId = corporateId || 'demo-corp-cikarang';
+  const corp = memCorporateProfiles.get(targetCorpId);
+
+  const financialSplit = calculateTripFinancialSplit({
+    grossFareIdr: fareIdr,
+    coinsToSpend: brcSpent,
+    corporateName: corp?.companyName,
+  });
 
   if (brcSpent > 0) {
     const spendRes = await spendBalance(
@@ -365,13 +432,13 @@ export async function recordCorporateCommuteTrip(params: {
         success: false,
         co2SavedKg: 0,
         netFareIdr: fareIdr,
+        financialSplit,
         error: spendRes.error || 'Gagal memproses potongan koin',
       };
     }
   }
 
   // Catat ke log emisi korporat jika terhubung ke profil perusahaan
-  const targetCorpId = corporateId || 'demo-corp-cikarang';
   const emissionLog: CorporateEmissionLog = {
     id: `esg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     corporateId: targetCorpId,
@@ -411,6 +478,7 @@ export async function recordCorporateCommuteTrip(params: {
     success: true,
     co2SavedKg,
     netFareIdr,
+    financialSplit,
   };
 }
 

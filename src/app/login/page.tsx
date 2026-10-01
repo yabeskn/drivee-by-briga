@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SupabaseSignInButton } from "@/components/SupabaseSignInButton";
 import { LanguageProvider } from "@/i18n/LanguageContext";
@@ -9,6 +9,8 @@ import { supabase } from "@/lib/supabase/client";
 
 function LoginContent() {
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const nextParam = searchParams.get("next");
 	const [phone, setPhone] = useState("");
 	const [isSending, setIsSending] = useState(false);
 	const [sendResult, setSendResult] = useState<{
@@ -17,10 +19,19 @@ function LoginContent() {
 	} | null>(null);
 
 	useEffect(() => {
+		const redirectLoggedInUser = () => {
+			localStorage.setItem("drivee_logged_in", "true");
+			if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")) {
+				router.replace(nextParam);
+				return;
+			}
+			const hasDriverId = localStorage.getItem("drivee_driver_id");
+			router.replace(hasDriverId ? "/go" : "/commuter");
+		};
+
 		supabase.auth.getSession().then(({ data: { session } }) => {
 			if (session?.user) {
-				localStorage.setItem("drivee_logged_in", "true");
-				router.replace("/go");
+				redirectLoggedInUser();
 			} else {
 				localStorage.removeItem("drivee_logged_in");
 			}
@@ -30,15 +41,14 @@ function LoginContent() {
 			data: { subscription },
 		} = supabase.auth.onAuthStateChange((_event, session) => {
 			if (session?.user) {
-				localStorage.setItem("drivee_logged_in", "true");
-				router.replace("/go");
+				redirectLoggedInUser();
 			}
 		});
 
 		return () => {
 			subscription.unsubscribe();
 		};
-	}, [router]);
+	}, [router, nextParam]);
 
 	const handleSendVerification = async () => {
 		if (!phone) return;
@@ -176,7 +186,9 @@ function LoginContent() {
 export default function LoginPage() {
 	return (
 		<LanguageProvider>
-			<LoginContent />
+			<Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center text-zinc-500">Loading...</div>}>
+				<LoginContent />
+			</Suspense>
 		</LanguageProvider>
 	);
 }

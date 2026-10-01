@@ -26,6 +26,10 @@ export interface TelemetryPoint {
   pollingIntervalMs: number; // interval aktif saat titik diambil
   isAccelPaused: boolean;   // true jika accel di-pause (idle >1min)
   drivingStatus: 'smooth' | 'harsh_accel' | 'sudden_brake' | 'idle';
+  // Estimasi baterai per-titik (sejak DISPATCHED; null saat kapasitas
+  // kendaraan / SoC awal tidak diketahui)
+  batterySoc: number | null; // SoC % pada titik ini (estimasi integrasi)
+  powerKw: number | null;    // daya rata-rata kW sejak titik sebelumnya
 }
 
 /** Metadata sesi trip — satu record per trip */

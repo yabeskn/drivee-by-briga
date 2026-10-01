@@ -33,6 +33,7 @@ export const PROTECTED_ROUTES = [
 	"/special-track",
 	"/verify",
 	"/go",
+	"/commuter",
 ];
 
 /** Rute publik — tidak pernah diblokir middleware */

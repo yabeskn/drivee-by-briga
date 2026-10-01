@@ -198,14 +198,23 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 					</div>
 				</div>
 
-				{isLoggedIn && (
-					<div className="flex items-center space-x-2 bg-zinc-900/80 px-2.5 py-1 rounded-full border border-zinc-800">
-						<div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-						<span className="text-[11px] font-medium text-zinc-300 truncate max-w-[90px]">
-							{localStorage.getItem("drivee_name") || "Driver"}
-						</span>
-					</div>
-				)}
+				<div className="flex items-center gap-1.5">
+					<a
+						href="/commuter"
+						className="text-[10px] px-2.5 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-zinc-300 hover:text-white hover:border-emerald-500 transition-colors"
+						title="Beralih ke Portal Penumpang / Komuter"
+					>
+						Mode Penumpang
+					</a>
+					{isLoggedIn && (
+						<div className="flex items-center space-x-2 bg-zinc-900/80 px-2.5 py-1 rounded-full border border-zinc-800">
+							<div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+							<span className="text-[11px] font-medium text-zinc-300 truncate max-w-[90px]">
+								{localStorage.getItem("drivee_name") || "Driver"}
+							</span>
+						</div>
+					)}
+				</div>
 			</div>
 
 			{/* Progress Steps */}

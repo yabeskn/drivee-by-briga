@@ -17,12 +17,16 @@ import {
   TrendingUp,
   Loader2,
   Camera,
+  Wallet,
+  Building2,
+  Sparkles,
 } from 'lucide-react';
 
-import { TripRecord, PhotoEvidence, TripSecurityContext } from '@/types/telematics';
+import { TripRecord, PhotoEvidence, TripSecurityContext, TripFinancialSplit } from '@/types/telematics';
 import { TelematicsState } from '@/hooks/useTelematics';
 import { submitAndVerifyTrip, type TripSubmissionResult } from '@/lib/trip-submitter';
 import { EcoScoreBreakdown } from '@/lib/eco-score';
+import { calculateTripFinancialSplit } from '@/lib/corporate/commute';
 import { CameraCapture } from '@/components/CameraCapture';
 
 interface EndTripDashboardProps {
@@ -75,6 +79,13 @@ export function EndTripDashboard({
   const calculatedDistance = Math.max(0, Number((finalOdo - startOdo).toFixed(1)));
   const calculatedSocUsed = Math.max(0, startSoc - finalSoc);
   const calculatedKwhUsed = Number(((calculatedSocUsed / 100) * batteryCapKwh).toFixed(2));
+
+  // Hitung bagi hasil finansial pengemudi (Platform Fee Absorption)
+  const financialSplit: TripFinancialSplit = tripData.financial_split ?? calculateTripFinancialSplit({
+    grossFareIdr: Math.max(15000, Math.round((15000 + calculatedDistance * 4500) / 1000) * 1000),
+    coinsToSpend: securityContext?.boardedPassenger?.discountBrc ?? 0,
+    corporateName: securityContext?.boardedPassenger?.companyName,
+  });
 
   /**
    * UX Anti-Friction: submit TIDAK menunggu foto. Foto bukti akhir
@@ -317,6 +328,107 @@ export function EndTripDashboard({
             )}
           </div>
         )}
+      </div>
+
+      {/* DRIVER EARNINGS BREAKDOWN (Platform Fee Absorption Model) */}
+      <div className="bg-zinc-950 border border-emerald-500/30 rounded-xl p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-white">Pendapatan Bersih Driver</h3>
+              <p className="text-[10px] text-zinc-500">Transparansi bagi hasil & proteksi fee</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-xl font-bold font-mono text-emerald-400 leading-none">
+              Rp {financialSplit.driverNetPayoutIdr.toLocaleString('id-ID')}
+            </span>
+            <span className="block text-[10px] text-emerald-300/80 font-mono">Net Payout</span>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-[11px] font-mono bg-zinc-900/80 p-3 rounded-lg border border-zinc-800/80">
+          <div className="flex justify-between text-zinc-300">
+            <span>Tarif Kotor Perjalanan</span>
+            <span className="text-white font-medium">
+              Rp {financialSplit.grossFareIdr.toLocaleString('id-ID')}
+            </span>
+          </div>
+
+          <div className="border-t border-zinc-800/80 pt-2 space-y-1">
+            <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+              Sumber Pembayaran Penumpang:
+            </div>
+            <div className="flex justify-between text-zinc-400 pl-2">
+              <span>• Tunai / Dompet Digital</span>
+              <span className="text-zinc-200">
+                Rp {financialSplit.passengerPaidIdr.toLocaleString('id-ID')}
+              </span>
+            </div>
+            {financialSplit.brcCoinsUsed > 0 && (
+              <div className="flex justify-between text-zinc-400 pl-2">
+                <span className="flex items-center gap-1 text-amber-300">
+                  <Coins className="w-3 h-3 text-amber-400" />
+                  Subsidi Voucher ({financialSplit.brcCoinsUsed} BRC)
+                </span>
+                <span className="text-amber-400 font-medium">
+                  +Rp {financialSplit.brcSubsidyIdr.toLocaleString('id-ID')}
+                </span>
+              </div>
+            )}
+            {financialSplit.corporateSponsor && (
+              <div className="flex items-center gap-1 text-[10px] text-cyan-400 pl-2">
+                <Building2 className="w-3 h-3" />
+                <span>Sponsor Korporat: {financialSplit.corporateSponsor}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-zinc-800/80 pt-2 space-y-1">
+            <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+              Kalkulasi Biaya Layanan Platform:
+            </div>
+            <div className="flex justify-between text-zinc-400 pl-2">
+              <span>• Biaya Standar ({Math.round(financialSplit.standardPlatformFeeRate * 100)}%)</span>
+              <span className="text-zinc-400">
+                Rp {financialSplit.standardPlatformFeeIdr.toLocaleString('id-ID')}
+              </span>
+            </div>
+            {financialSplit.platformSubsidyAbsorbedIdr > 0 && (
+              <div className="flex justify-between text-zinc-400 pl-2">
+                <span className="text-emerald-400 font-medium">
+                  • Diserap Platform (Subsidi Voucher)
+                </span>
+                <span className="text-emerald-400 font-medium">
+                  -Rp {financialSplit.platformSubsidyAbsorbedIdr.toLocaleString('id-ID')}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between text-zinc-300 pl-2 font-medium">
+              <span>• Potongan Platform Efektif</span>
+              <span className={financialSplit.effectivePlatformFeeIdr === 0 ? 'text-emerald-400' : 'text-zinc-200'}>
+                Rp {financialSplit.effectivePlatformFeeIdr.toLocaleString('id-ID')}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* DRIVER PROTECTION GUARANTEE BADGE */}
+        <div className="mt-3 p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 flex items-start gap-2 text-[11px]">
+          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <div className="font-semibold text-emerald-300 flex items-center gap-1">
+              <span>Penghasilan Terlindungi Penuh</span>
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+            </div>
+            <p className="text-[10px] text-emerald-400/80 leading-relaxed">
+              Diskon BRC penumpang ditanggung platform Drifee tanpa memotong tarif hak pengemudi.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* VERIFICATION METRICS */}

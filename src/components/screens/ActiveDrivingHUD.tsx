@@ -18,6 +18,11 @@ import {
   Sun,
   UserRound,
   Navigation,
+  QrCode,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  X,
 } from 'lucide-react';
 import { useTelematics, TelematicsState } from '@/hooks/useTelematics';
 import { useSilentWatchdog } from '@/hooks/useSilentWatchdog';
@@ -36,6 +41,12 @@ interface ActiveDrivingHUDProps {
   onPhaseChange?: (phase: TripPhase) => void;
   /** Mode simulasi desktop/e2e: watchdog tidak menandai anomali */
   simulateMode?: boolean;
+  /**
+   * Kapasitas baterai (kWh) + SoC awal trip (%) — mengaktifkan
+   * estimasi daya/SoC per-titik telemetri sejak DISPATCHED.
+   */
+  batteryCapacityKwh?: number;
+  initialSoc?: number;
 }
 
 export function ActiveDrivingHUD({
@@ -45,11 +56,15 @@ export function ActiveDrivingHUD({
   initialPhase = 'DISPATCHED',
   onPhaseChange,
   simulateMode = false,
+  batteryCapacityKwh,
+  initialSoc,
 }: ActiveDrivingHUDProps) {
   const telemetry = useTelematics({
     tripId,
     enabled: useLiveSensors,
     useMockFallback: true,
+    batteryCapacityKwh,
+    initialSoc,
   });
 
   const [phase, setPhase] = useState<TripPhase>(initialPhase);
@@ -60,6 +75,56 @@ export function ActiveDrivingHUD({
   const [showSensorPanel, setShowSensorPanel] = useState(true);
   const [activeProfile, setActiveProfile] = useState<EcoProfile>('HIGHWAY_NORMAL');
   const [isOnline, setIsOnline] = useState(true);
+
+  // Commuter Boarding Verification States
+  const [showBoardingModal, setShowBoardingModal] = useState(false);
+  const [boardingCodeInput, setBoardingCodeInput] = useState('');
+  const [isVerifyingBoarding, setIsVerifyingBoarding] = useState(false);
+  const [boardingError, setBoardingError] = useState<string | null>(null);
+  const [boardedPassenger, setBoardedPassenger] = useState<{
+    name: string;
+    companyName?: string;
+    discountBrc: number;
+  } | null>(null);
+
+  const handleVerifyBoardingCode = async () => {
+    if (!boardingCodeInput.trim()) return;
+    setIsVerifyingBoarding(true);
+    setBoardingError(null);
+    try {
+      const res = await fetch('/api/commuter/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: boardingCodeInput.trim(), tripId }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setBoardedPassenger({
+          name: json.data.passengerName || 'Penumpang Komuter',
+          companyName: json.data.companyName,
+          discountBrc: json.data.discountBrc || 0,
+        });
+        deadheadDistanceRef.current = telemetry.tripDistanceKm;
+        setPhase('PASSENGER_PICKED_UP');
+        onPhaseChange?.('PASSENGER_PICKED_UP');
+        setShowBoardingModal(false);
+      } else {
+        setBoardingError(json.error || 'Kode boarding pass tidak valid');
+      }
+    } catch {
+      setBoardingError('Gagal menghubungi server validasi');
+    } finally {
+      setIsVerifyingBoarding(false);
+    }
+  };
+
+  const handleSkipBoardingCode = () => {
+    setBoardedPassenger({ name: 'Penumpang Retail / Umum', discountBrc: 0 });
+    deadheadDistanceRef.current = telemetry.tripDistanceKm;
+    setPhase('PASSENGER_PICKED_UP');
+    onPhaseChange?.('PASSENGER_PICKED_UP');
+    setShowBoardingModal(false);
+  };
 
   useEffect(() => {
     const updateOnlineStatus = () => setIsOnline(navigator.onLine);
@@ -98,7 +163,8 @@ export function ActiveDrivingHUD({
     watchdogReason: watchdog.reason,
     deadheadDistanceKm: deadheadDistanceRef.current ?? 0,
     proofEvidence,
-  }), [watchdog.status, watchdog.reason, proofEvidence]);
+    boardedPassenger,
+  }), [watchdog.status, watchdog.reason, proofEvidence, boardedPassenger]);
 
   const toggleProfile = () => {
     setActiveProfile((p) =>
@@ -402,13 +468,27 @@ export function ActiveDrivingHUD({
         )}
 
         <div className="pt-1">
+          {phase === 'PASSENGER_PICKED_UP' && boardedPassenger && (
+            <div className="mb-2 p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-800/80 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserRound className="w-4 h-4 text-cyan-400" />
+                <div>
+                  <div className="font-semibold text-white">{boardedPassenger.name}</div>
+                  <div className="text-[10px] text-zinc-400">{boardedPassenger.companyName || 'Penumpang Retail'}</div>
+                </div>
+              </div>
+              {boardedPassenger.discountBrc > 0 && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                  Diskon {boardedPassenger.discountBrc} BRC
+                </span>
+              )}
+            </div>
+          )}
+
           {phase === 'DISPATCHED' && (
             <button
               onClick={() => {
-                // Deadhead berakhir di sini — catat jarak kosong terkumpul
-                deadheadDistanceRef.current = telemetry.tripDistanceKm;
-                setPhase('PASSENGER_PICKED_UP');
-                onPhaseChange?.('PASSENGER_PICKED_UP');
+                setShowBoardingModal(true);
               }}
               className="w-full py-3 px-4 mb-2 bg-cyan-600/90 hover:bg-cyan-500 text-white font-semibold rounded-xl flex items-center justify-center space-x-2 transition-colors"
             >
@@ -429,6 +509,75 @@ export function ActiveDrivingHUD({
           </button>
         </div>
       </div>
+
+      {/* MODAL VERIFIKASI BOARDING CODE PENUMPANG */}
+      {showBoardingModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-bold text-white">Verifikasi Penumpang</h3>
+              </div>
+              <button
+                onClick={() => setShowBoardingModal(false)}
+                className="text-zinc-500 hover:text-zinc-300 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              Masukkan 6-digit Boarding Code dari aplikasi Drifee penumpang untuk mengaktifkan subsidi komuter dan audit Scope 3:
+            </p>
+
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={boardingCodeInput}
+                onChange={(e) => {
+                  setBoardingCodeInput(e.target.value.toUpperCase());
+                  setBoardingError(null);
+                }}
+                placeholder="BRG-XXX"
+                maxLength={8}
+                className="w-full text-center text-2xl font-mono font-bold tracking-widest px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-emerald-400 placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
+              />
+
+              {boardingError && (
+                <div className="text-[11px] text-red-400 flex items-center gap-1.5 justify-center">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{boardingError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={handleVerifyBoardingCode}
+                disabled={isVerifyingBoarding || !boardingCodeInput.trim()}
+                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 text-zinc-950 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5"
+              >
+                {isVerifyingBoarding ? (
+                  <span>Memvalidasi...</span>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Validasi & Naikkan Penumpang</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleSkipBoardingCode}
+                className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 font-medium text-xs rounded-xl transition-colors"
+              >
+                Lewati (Penumpang Retail / Tanpa Kode)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

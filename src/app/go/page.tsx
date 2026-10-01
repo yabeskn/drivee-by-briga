@@ -13,6 +13,7 @@ import { TripStateMachine } from "@/lib/trip-state-machine";
 import { supabase } from "@/lib/supabase/client";
 import { registerServiceWorker, skipWaiting } from "@/lib/sw-register";
 import { setupAutoSync } from "@/lib/sync/engine";
+import { calculateTripFinancialSplit } from "@/lib/corporate/commute";
 import type { EVVehicle, TripPhase, TripRecord, TripSecurityContext } from "@/types/telematics";
 
 function GoApp() {
@@ -165,10 +166,23 @@ function GoApp() {
 		setFinalTelemetry(telemetry);
 		setSecurityContext(security);
 		if (currentTripData) {
+			const revDist = Math.max(0, telemetry.tripDistanceKm - (security.deadheadDistanceKm || 0));
+			// Perkiraan tarif kotor komuter EV: base Rp 15.000 + Rp 4.500/km
+			const estGrossFare = Math.max(15000, Math.round((15000 + revDist * 4500) / 1000) * 1000);
+			const coinsToSpend = security.boardedPassenger?.discountBrc ?? 0;
+			const split = calculateTripFinancialSplit({
+				grossFareIdr: estGrossFare,
+				coinsToSpend,
+				corporateName: security.boardedPassenger?.companyName,
+			});
+
 			setCurrentTripData({
 				...currentTripData,
 				end_time: new Date().toISOString(),
 				distance_km: telemetry.tripDistanceKm,
+				revenue_distance_km: revDist,
+				deadhead_distance_km: security.deadheadDistanceKm,
+				financial_split: split,
 				telemetry_summary: {
 					harsh_accelerations: telemetry.harshAccelCount,
 					harsh_brakings: telemetry.harshBrakeCount,

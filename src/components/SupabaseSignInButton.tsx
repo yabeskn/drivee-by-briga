@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { signInWithGoogle } from '@/lib/supabase/auth';
 
 export function SupabaseSignInButton() {
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get('next') || undefined;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,7 +14,7 @@ export function SupabaseSignInButton() {
     setIsLoading(true);
     setError(null);
 
-    const result = await signInWithGoogle();
+    const result = await signInWithGoogle(nextPath);
 
     if (!result.success) {
       setError(result.error || 'Sign in failed');

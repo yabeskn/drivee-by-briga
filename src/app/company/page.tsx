@@ -14,12 +14,17 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
+  Loader2,
+  FileCheck,
 } from 'lucide-react';
 import { rentalPackages } from '@/lib/hr/rental';
+import { downloadEsgAuditPdf } from '@/lib/esg-pdf-generator';
 
 export default function CompanyEsgPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState('demo-corp-cikarang');
   const [activeTab, setActiveTab] = useState<'overview' | 'rentals' | 'commute'>('commute');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
 
   // Summary Metrics
   const summary = {
@@ -29,6 +34,29 @@ export default function CompanyEsgPage() {
     totalRentalTrips: 182,
     carbonCreditsBrc: 14200,
     certifiedPeriod: 'Q3 2026',
+  };
+
+  const handleExportPdf = () => {
+    setIsExporting(true);
+    try {
+      downloadEsgAuditPdf({
+        companyName: 'PT Cikarang Mobility Solusindo (Tenant MM2100 & GIIC)',
+        companyId: selectedCompanyId,
+        period: 'Triwulan III (Q3) 2026 — Periode Juli s/d September 2026',
+        totalDistanceKm: 3842.6,
+        totalEmissionsAvoidedKg: 526.4,
+        scope3ReductionPercent: summary.scope3ReductionPercent,
+        totalTrips: 148,
+        activeEmployees: 38,
+        carbonCreditsBrc: summary.carbonCreditsBrc,
+      }, `Laporan_Audit_Emisi_Scope3_POJK51_Q3_2026.pdf`);
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 4000);
+    } catch (err) {
+      console.error('Gagal mencetak dokumen PDF audit ESG:', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -61,11 +89,27 @@ export default function CompanyEsgPage() {
               Fleet Admin
             </Link>
             <button
-              onClick={() => alert('Laporan ESG resmi (PDF) telah dikirimkan ke email PIC Perusahaan.')}
-              className="text-xs px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+              onClick={handleExportPdf}
+              disabled={isExporting}
+              className="text-xs px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-700 text-zinc-950 font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+              title="Unduh dokumen resmi Laporan Audit Emisi POJK 51 / Scope 3 Category 7 dalam format PDF"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export Laporan ESG</span>
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Menyiapkan PDF...</span>
+                </>
+              ) : exportSuccess ? (
+                <>
+                  <FileCheck className="w-3.5 h-3.5 text-zinc-950" />
+                  <span>PDF Terunduh!</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Cetak Laporan Audit POJK 51 (PDF)</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -310,7 +354,18 @@ export default function CompanyEsgPage() {
                   <h3 className="text-sm font-semibold text-white">Riwayat Perjalanan Komuter Karyawan Tersubsidi</h3>
                   <p className="text-xs text-zinc-400">Tercatat secara atomik dengan perhitungan telematika emisi POJK 51/2017</p>
                 </div>
-                <span className="text-xs text-zinc-400 font-mono">Scope 3 Cat 7</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-400 font-mono hidden sm:inline">Scope 3 Cat 7</span>
+                  <button
+                    onClick={handleExportPdf}
+                    disabled={isExporting}
+                    className="text-[11px] px-2.5 py-1 bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 rounded font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Unduh Laporan Audit POJK 51 dalam format PDF"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Unduh PDF Audit</span>
+                  </button>
+                </div>
               </div>
               <div className="divide-y divide-zinc-800/60 text-xs">
                 {[

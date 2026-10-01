@@ -7,13 +7,14 @@ export interface AuthUser {
 	image?: string;
 }
 
-export async function signInWithGoogle(): Promise<{
+export async function signInWithGoogle(nextPath?: string): Promise<{
 	success: boolean;
 	error?: string;
 }> {
 	try {
 		const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-		const redirectTo = `${baseUrl}/auth/callback?next=/go`;
+		const target = nextPath && nextPath.startsWith('/') ? nextPath : '/commuter';
+		const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent(target)}`;
 
 		const { error } = await supabase.auth.signInWithOAuth({
 			provider: "google",

@@ -45,10 +45,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Action 2: Apply discount and record trip completion
-    if (action === 'apply') {
+    if (action === 'apply' || action === 'record') {
       if (!tripId) {
         return NextResponse.json(
-          { success: false, error: 'tripId is required when action is apply' },
+          { success: false, error: 'tripId is required when action is apply or record' },
           { status: 400 }
         );
       }
@@ -74,9 +74,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       return NextResponse.json({
         success: true,
+        financialSplit: tripRes.financialSplit,
         data: {
           co2SavedKg: tripRes.co2SavedKg,
           netFareIdr: tripRes.netFareIdr,
+          financialSplit: tripRes.financialSplit,
           newBalance: updatedBalanceObj.balance,
           message: 'Potongan BrigaCoin berhasil diterapkan untuk perjalanan Mobil EV Anda',
         },

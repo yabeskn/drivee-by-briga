@@ -1,111 +1,62 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { setValidSession } from "../fixtures/session";
 
-test.describe('Photo Capture - Anti-Spoofing', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    // Login first
-    await page.fill('input[type="tel"]', '081234567890');
-    await page.fill('input[type="password"]', '123456');
-    await page.click('button:has-text("Masuk")');
-    await page.waitForURL('**/go');
-  });
+// ─────────────────────────────────────────────────────────────
+// Photo Capture — kontrak BARU (anti-friction)
+//
+// LAMA (dihapus): input[type=file] odometer/baterai wajib di awal
+// dan akhir trip. Peminta validasi manual di tepi trip adalah
+// friction yang dilarang spesifikasi.
+//
+// BARU:
+//  - Tidak pernah ada upload foto di awal/akhir trip.
+//  - LiveProofCapture (kamera LIVE via getUserMedia, tanpa file
+//    upload) HANYA dirender saat watchdog → ANOMALY_DETECTED,
+//    mem-bekukan app sampai foto dasbor valid.
+// ─────────────────────────────────────────────────────────────
 
-  test('should show photo capture section', async ({ page }) => {
-    await expect(page.locator('text=Bukti Foto')).toBeVisible();
-  });
+test.describe("Anti-Friction Photo Policy", () => {
+	test.beforeEach(async ({ page }) => {
+		await setValidSession(page);
+	});
 
-  test('should have odometer photo upload', async ({ page }) => {
-    const odometerInput = page.locator('input[type="file"][accept*="image"]').first();
-    await expect(odometerInput).toBeVisible();
-  });
+	test("alur trip normal tidak pernah menampilkan modal LiveProofCapture", async ({
+		page,
+	}) => {
+		await page.goto("/go");
+		// Modal wajib TIDAK muncul pada alur normal (watchdog belum
+		// mendeteksi anomali apa pun).
+		await expect(page.getByRole("dialog")).toHaveCount(0, {
+			timeout: 10_000,
+		});
+	});
 
-  test('should have battery photo upload', async ({ page }) => {
-    const batteryInput = page.locator('input[type="file"][accept*="image"]').nth(1);
-    await expect(batteryInput).toBeVisible();
-  });
+	test("tidak ada elemen upload file di seluruh alur awal trip", async ({
+		page,
+	}) => {
+		await page.goto("/go");
+		await expect(page.locator('input[type="file"]')).toHaveCount(0);
+	});
+});
 
-  test('should upload odometer photo', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]').first();
-    await fileInput.setInputFiles({
-      name: 'odometer.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from('fake-image-data'),
-    });
-    await expect(page.locator('text=Foto Odometer uploaded')).toBeVisible();
-  });
+test.describe("LiveProofCapture — kontrak arsitektur", () => {
+	// Guard terhadap refactor: komponen modal keamanan wajib tetap
+	// kamera LIVE (getUserMedia) dan TANPA file upload.
+	const componentPath = resolve(
+		process.cwd(),
+		"src/components/LiveProofCapture.tsx",
+	);
 
-  test('should upload battery photo', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]').nth(1);
-    await fileInput.setInputFiles({
-      name: 'battery.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from('fake-image-data'),
-    });
-    await expect(page.locator('text=Foto Baterai uploaded')).toBeVisible();
-  });
+	test("memakai kamera live (getUserMedia), bukan input file", () => {
+		const source = readFileSync(componentPath, "utf-8");
+		expect(source).toContain("getUserMedia");
+		expect(source).not.toMatch(/type\s*=\s*["']file["']/);
+	});
 
-  test('should show preview after upload', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]').first();
-    await fileInput.setInputFiles({
-      name: 'odometer.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from('fake-image-data'),
-    });
-    await expect(page.locator('img[alt="Preview"]')).toBeVisible();
-  });
-
-  test('should require both photos before submit', async ({ page }) => {
-    const submitBtn = page.locator('button:has-text("Kirim")');
-    await expect(submitBtn).toBeDisabled();
-  });
-
-  test('should enable submit after both photos uploaded', async ({ page }) => {
-    // Upload odometer
-    await page.locator('input[type="file"]').first().setInputFiles({
-      name: 'odometer.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from('fake-image-data'),
-    });
-    // Upload battery
-    await page.locator('input[type="file"]').nth(1).setInputFiles({
-      name: 'battery.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from('fake-image-data'),
-    });
-    const submitBtn = page.locator('button:has-text("Kirim")');
-    await expect(submitBtn).toBeEnabled();
-  });
-
-  test('should validate photo file size', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]').first();
-    // Create a large file (>1MB)
-    const largeBuffer = Buffer.alloc(2 * 1024 * 1024, 'a');
-    await fileInput.setInputFiles({
-      name: 'large.jpg',
-      mimeType: 'image/jpeg',
-      buffer: largeBuffer,
-    });
-    await expect(page.locator('text=File terlalu besar')).toBeVisible();
-  });
-
-  test('should validate photo file type', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]').first();
-    await fileInput.setInputFiles({
-      name: 'document.pdf',
-      mimeType: 'application/pdf',
-      buffer: Buffer.from('fake-pdf-data'),
-    });
-    await expect(page.locator('text=Format file tidak valid')).toBeVisible();
-  });
-
-  test('should allow retake photo', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]').first();
-    await fileInput.setInputFiles({
-      name: 'odometer.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from('fake-image-data'),
-    });
-    await page.click('button:has-text("Retake")');
-    await expect(page.locator('input[type="file"]').first()).toBeVisible();
-  });
+	test("hanya dirender saat ANOMALY_DETECTED (prop status watchdog)", () => {
+		const source = readFileSync(componentPath, "utf-8");
+		expect(source).toMatch(/ANOMALY_DETECTED/);
+	});
 });

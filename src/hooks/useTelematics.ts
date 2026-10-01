@@ -84,6 +84,10 @@ export interface TelematicsState {
   // WakeLock
   wakeLockActive: boolean;
 
+  // Baterai (estimasi per-titik sejak DISPATCHED)
+  batterySoc: number | null; // SoC % terkini (estimasi integrasi daya)
+  powerKw: number | null;    // daya rata-rata kW sejak titik sebelumnya
+
   // Errors
   sensorError: string | null;
 }
@@ -92,6 +96,13 @@ interface UseTelematicsOptions {
   tripId: string;
   enabled: boolean;            // true saat trip aktif
   useMockFallback?: boolean;   // fallback mock bila sensor tak tersedia
+  /**
+   * Kapasitas baterai kendaraan (kWh) + SoC awal trip (%). Dengan
+   * keduanya, hook mengestimasi SoC & daya per-titik telemetri
+   * sejak DISPATCHED (disimpan ke telemetry_points.battery_soc / power_kw).
+   */
+  batteryCapacityKwh?: number;
+  initialSoc?: number;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -101,6 +112,8 @@ export function useTelematics({
   tripId,
   enabled,
   useMockFallback = true,
+  batteryCapacityKwh,
+  initialSoc,
 }: UseTelematicsOptions): TelematicsState {
   // ── Public state ──────────────────────────────────────────
   const [state, setState] = useState<TelematicsState>({
@@ -131,6 +144,8 @@ export function useTelematics({
     harshBrakeCount: 0,
     idleDurationSec: 0,
     wakeLockActive: false,
+    batterySoc: typeof initialSoc === 'number' ? initialSoc : null,
+    powerKw: null,
     sensorError: null,
   });
 
@@ -155,6 +170,61 @@ export function useTelematics({
   const prevSpeedRef = useRef(0);
   const mockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastRenderRef = useRef(0); // FIX B3: throttle display updates
+  // Estimasi baterai per-titik — model konsumsi: P(t) = P_const + c·v³
+  // (drag) + m·a·v (akselerasi), dikurangi regen saat deselerasi kuat.
+  const socRef = useRef<number | null>(typeof initialSoc === 'number' ? initialSoc : null);
+  const lastSocSampleRef = useRef<{ ts: number; soc: number } | null>(null);
+
+  /**
+   * Estimasi daya baterai (kW) untuk interval pergerakan terakhir.
+   * Model fisika sederhana EV:
+   *   P = P_const + c·v³ + m·a·v   (positif = konsumsi)
+   *   regen: a < -1.5 m/s² dan v > 5 km/h → negatif terbatas -40 kW
+   * Mengembalikan null saat kapasitas/SoC awal tidak diketahui.
+   */
+  const estimatePowerKw = useCallback(
+    (
+      speedKmh: number,
+      accelMps2: number,
+      intervalMs: number,
+      capacityKwh: number,
+    ): number => {
+      const v = Math.max(0, speedKmh) / 3.6; // m/s
+      const a = Math.max(-4, Math.min(4, accelMps2)); // clamp ±4 m/s²
+      const P_CONST_KW = 1.2; // HVAC/ECU/kelistrikan
+      const DRAG_C = 7.5e-5;  // c·v³ pada 90 km/h ≈ 5.3 kW
+      const MASS_KG = 1600;
+      let powerKw = P_CONST_KW + DRAG_C * v * v * v + (MASS_KG * a * v) / 3.6e6;
+      // Regen hanya saat deselerasi signifikan (bukan saat idle)
+      if (a < -1.5 && v > 1.4) {
+        powerKw = Math.max(powerKw, -40); // batas regen 40 kW
+      } else {
+        powerKw = Math.max(powerKw, 0.2); // minimal tetap menyala
+      }
+      void intervalMs;
+      return Math.round(powerKw * 100) / 100;
+    },
+    [],
+  );
+
+  /**
+   * SoC berikutnya: integrasi daya terhadap kapasitas baterai.
+   * Guard: bila melewati batas 0/100, kembali ke nilai sebelumnya.
+   */
+  const nextSoc = useCallback(
+    (
+      prevSoc: number,
+      powerKw: number,
+      intervalMs: number,
+      capacityKwh: number,
+    ): number => {
+      const deltaSoc = (powerKw * (intervalMs / 3_600_000) * 100) / capacityKwh;
+      const candidate = prevSoc - deltaSoc;
+      if (candidate < 0 || candidate > 100) return prevSoc;
+      return Math.round(candidate * 10) / 10;
+    },
+    [],
+  );
 
   // ── Classify driving status from acceleration ─────────────
   const classifyDriving = useCallback(
@@ -344,6 +414,30 @@ export function useTelematics({
 
         prevSpeedRef.current = calculatedSpeedKmh;
 
+        // ── Estimasi baterai per-titik (sejak DISPATCHED) ──
+        let pointSoc: number | null = null;
+        let pointPowerKw: number | null = null;
+        if (
+          typeof batteryCapacityKwh === 'number' &&
+          batteryCapacityKwh > 0 &&
+          socRef.current != null
+        ) {
+          pointPowerKw = estimatePowerKw(
+            calculatedSpeedKmh,
+            accel.mag,
+            intervalMs,
+            batteryCapacityKwh,
+          );
+          pointSoc = nextSoc(
+            socRef.current,
+            pointPowerKw,
+            intervalMs,
+            batteryCapacityKwh,
+          );
+          socRef.current = pointSoc;
+          lastSocSampleRef.current = { ts: now, soc: pointSoc };
+        }
+
         // ── Push telemetry point to in-memory buffer (always, unthrottled) ──
         const point: TelemetryPoint = {
           tripId,
@@ -362,6 +456,8 @@ export function useTelematics({
           pollingIntervalMs: intervalMs,
           isAccelPaused: isAccelPausedRef.current,
           drivingStatus,
+          batterySoc: pointSoc,
+          powerKw: pointPowerKw,
         };
         bufferRef.current.push(point);
 
@@ -395,6 +491,8 @@ export function useTelematics({
             statusMessage,
             harshAccelCount: harshAccelRef.current,
             harshBrakeCount: harshBrakeRef.current,
+            batterySoc: pointSoc,
+            powerKw: pointPowerKw,
             idleDurationSec: Math.round(idleDurRef.current),
             sensorError: null,
           }));
@@ -483,6 +581,30 @@ export function useTelematics({
 
       prevSpeedRef.current = mockSpeed;
 
+      // Estimasi baterai per-titik (mock path — model sama)
+      let mockPointSoc: number | null = null;
+      let mockPointPowerKw: number | null = null;
+      if (
+        typeof batteryCapacityKwh === 'number' &&
+        batteryCapacityKwh > 0 &&
+        socRef.current != null
+      ) {
+        mockPointPowerKw = estimatePowerKw(
+          mockSpeed,
+          mockMag,
+          intervalMs,
+          batteryCapacityKwh,
+        );
+        mockPointSoc = nextSoc(
+          socRef.current,
+          mockPointPowerKw,
+          intervalMs,
+          batteryCapacityKwh,
+        );
+        socRef.current = mockPointSoc;
+        lastSocSampleRef.current = { ts: now, soc: mockPointSoc };
+      }
+
       // Buffer
       const point: TelemetryPoint = {
         tripId,
@@ -501,6 +623,8 @@ export function useTelematics({
         pollingIntervalMs: intervalMs,
         isAccelPaused: isAccelPausedRef.current,
         drivingStatus,
+        batterySoc: mockPointSoc,
+        powerKw: mockPointPowerKw,
       };
       bufferRef.current.push(point);
 
@@ -529,6 +653,8 @@ export function useTelematics({
         harshAccelCount: harshAccelRef.current,
         harshBrakeCount: harshBrakeRef.current,
         idleDurationSec: Math.round(idleDurRef.current),
+        batterySoc: mockPointSoc,
+        powerKw: mockPointPowerKw,
         sensorError: '[MOCK] Sensor simulasi desktop aktif',
       }));
     }, 1000);

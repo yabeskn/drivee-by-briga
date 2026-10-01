@@ -51,6 +51,12 @@ export interface TripSecurityContext {
   deadheadDistanceKm: number;
   /** Bukti foto live dari LiveProofCapture (jika pernah dipicu) */
   proofEvidence: PhotoEvidence | null;
+  /** Info penumpang komuter yang dijemput (opsional) */
+  boardedPassenger?: {
+    name: string;
+    companyName?: string;
+    discountBrc: number;
+  } | null;
 }
 
 export type VehicleCategory = 'standard' | 'professional' | 'premium' | 'premium_plus';
@@ -158,6 +164,8 @@ export interface TripRecord {
   /** Invisible Security: watchdog menandai anomali? */
   watchdog_flagged?: boolean;
   watchdog_anomaly_reason?: string | null;
+  /** Bagi hasil finansial & rincian biaya platform */
+  financial_split?: TripFinancialSplit;
 }
 
 export interface PhotoEvidence {
@@ -353,4 +361,62 @@ export interface UnifiedUser {
     currency: 'BRC';
     lastUpdated: Date;
   };
+}
+
+// ── Commuter & Passenger Boarding Types ─────────────────────
+
+export interface BoardingPass {
+  code: string; // e.g. "BRG-824"
+  userId: string;
+  passengerEmail: string;
+  passengerName: string;
+  corporateId?: string;
+  companyName?: string;
+  subsidyBalanceBrc: number;
+  discountBrcSelected: number;
+  estimatedFareIdr: number;
+  routeCorridor?: string;
+  status: 'active' | 'boarded' | 'completed' | 'expired';
+  tripId?: string;
+  driverId?: string;
+  financialSplit?: TripFinancialSplit;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface BoardingPassValidationResult {
+  success: boolean;
+  boardingPass?: BoardingPass;
+  passengerName?: string;
+  companyName?: string;
+  discountBrc?: number;
+  discountIdr?: number;
+  error?: string;
+}
+
+// ── Financial Split & Fee Absorption Types ──────────────────
+
+export interface TripFinancialSplit {
+  /** Tarif kotor perjalanan sebelum diskon (IDR) */
+  grossFareIdr: number;
+  /** Pembayaran tunai/e-wallet aktual dari penumpang (IDR) */
+  passengerPaidIdr: number;
+  /** Nilai subsidi voucher BrigaCoin yang dipakai penumpang (IDR) */
+  brcSubsidyIdr: number;
+  /** Jumlah koin BrigaCoin yang digunakan */
+  brcCoinsUsed: number;
+  /** Persentase standar biaya layanan platform (default 0.15 = 15%) */
+  standardPlatformFeeRate: number;
+  /** Nilai standar biaya layanan platform sebelum subsidi (IDR) */
+  standardPlatformFeeIdr: number;
+  /** Nilai subsidi diskon yang diserap dari jatah platform fee (IDR) */
+  platformSubsidyAbsorbedIdr: number;
+  /** Biaya platform efektif yang dipotong (min 0) */
+  effectivePlatformFeeIdr: number;
+  /** Payout bersih yang diterima pengemudi (IDR, terlindungi penuh) */
+  driverNetPayoutIdr: number;
+  /** Penanda bahwa penghasilan pengemudi terlindungi 100% */
+  driverEarningsProtected: boolean;
+  /** Nama entitas korporat sponsor/mitra ESG */
+  corporateSponsor?: string;
 }
