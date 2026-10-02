@@ -7,13 +7,14 @@ import { BottomNav, type ScreenType } from "@/components/layout/BottomNav";
 import { MobileShell } from "@/components/layout/MobileShell";
 import { ActiveDrivingHUD } from "@/components/screens/ActiveDrivingHUD";
 import { EndTripDashboard } from "@/components/screens/EndTripDashboard";
-import { LoginVehicleScreen } from "@/components/screens/LoginVehicleScreen";
+import { LoginVehicleScreen, type ActiveDriverShift } from "@/components/screens/LoginVehicleScreen";
 import type { TelematicsState } from "@/hooks/useTelematics";
 import { TripStateMachine } from "@/lib/trip-state-machine";
 import { supabase } from "@/lib/supabase/client";
 import { registerServiceWorker, skipWaiting } from "@/lib/sw-register";
 import { setupAutoSync } from "@/lib/sync/engine";
 import { calculateTripFinancialSplit } from "@/lib/corporate/commute";
+import type { HubGeofenceResult } from "@/lib/geofence";
 import type { EVVehicle, TripPhase, TripRecord, TripSecurityContext } from "@/types/telematics";
 
 function GoApp() {
@@ -22,6 +23,9 @@ function GoApp() {
 	const [activeScreen, setActiveScreen] = useState<ScreenType>("login");
 	const [isDrivingActive, setIsDrivingActive] = useState<boolean>(false);
 	const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle | null>(
+		null,
+	);
+	const [activeShift, setActiveShift] = useState<ActiveDriverShift | null>(
 		null,
 	);
 	const [currentTripData, setCurrentTripData] = useState<TripRecord | null>(
@@ -96,7 +100,7 @@ function GoApp() {
 		startSoc: number;
 		startOdo: number;
 		corridor: string;
-		geofence: { allowed: boolean; distanceMeters: number | null; reason: string };
+		geofence: HubGeofenceResult;
 	}) => {
 		const tripId = `trip_${Date.now()}`;
 		const initialTrip: TripRecord = {
@@ -120,6 +124,7 @@ function GoApp() {
 			start_odometer_km: config.startOdo,
 			end_odometer_km: config.startOdo,
 			distance_km: 0,
+			deadhead_distance_km: config.geofence.deadheadDistanceKm || 0,
 			energy_used_soc_percent: 0,
 			energy_used_kwh: 0,
 			telemetry_summary: {
@@ -176,12 +181,18 @@ function GoApp() {
 				corporateName: security.boardedPassenger?.companyName,
 			});
 
+			const endOdo = Math.round((currentTripData.start_odometer_km + telemetry.tripDistanceKm) * 10) / 10;
+			const endSoc = Math.max(5, currentTripData.start_battery_soc - Math.round(telemetry.tripDistanceKm * 0.35));
+			const totalDeadhead = (security.deadheadDistanceKm || 0) + (currentTripData.deadhead_distance_km || 0);
+
 			setCurrentTripData({
 				...currentTripData,
 				end_time: new Date().toISOString(),
+				end_odometer_km: endOdo,
+				end_battery_soc: endSoc,
 				distance_km: telemetry.tripDistanceKm,
 				revenue_distance_km: revDist,
-				deadhead_distance_km: security.deadheadDistanceKm,
+				deadhead_distance_km: totalDeadhead,
 				financial_split: split,
 				telemetry_summary: {
 					harsh_accelerations: telemetry.harshAccelCount,
@@ -193,8 +204,39 @@ function GoApp() {
 				},
 				trip_phase_timeline: tripStateMachine.getTimeline(),
 			});
+
+			// Update shift aktif agar trip berikutnya tidak perlu scan/login ulang dan melacak deadhead antar-trip
+			setActiveShift((prev) => ({
+				shiftId: prev?.shiftId || `shift_${Date.now()}`,
+				vehicle: selectedVehicle || {
+					id: currentTripData.vehicle_id,
+					code: currentTripData.vehicle_name,
+					name: currentTripData.vehicle_name,
+					model: "EV",
+					licensePlate: currentTripData.license_plate,
+					batteryCapacityKwh: 60,
+					currentSoC: endSoc,
+					estimatedRangeKm: Math.round(endSoc * 3.5),
+					hubLocation: "Koridor Jabodetabek",
+					status: "in_service",
+					efficiencyKwhPer100Km: 15,
+					category: "standard",
+					seats: 4,
+				},
+				startTime: prev?.startTime || tripStartTime,
+				tripsCount: (prev?.tripsCount || 0) + 1,
+				lastDropoffLocation: (telemetry.lat && telemetry.lng) ? { lat: telemetry.lat, lng: telemetry.lng } : prev?.lastDropoffLocation,
+				lastOdo: endOdo,
+				lastSoc: endSoc,
+			}));
 		}
 		setActiveScreen("end-trip");
+	};
+
+	const handleCheckoutShift = () => {
+		setActiveShift(null);
+		setSelectedVehicle(null);
+		setActiveScreen("login");
 	};
 
 	const handleStartNewTrip = () => {
@@ -215,7 +257,11 @@ function GoApp() {
 		>
 			<div className="flex-1 flex flex-col w-full h-full">
 				{activeScreen === "login" && (
-					<LoginVehicleScreen onStartTrip={handleStartTrip} />
+					<LoginVehicleScreen
+						onStartTrip={handleStartTrip}
+						activeShift={activeShift}
+						onCheckoutShift={handleCheckoutShift}
+					/>
 				)}
 
 				{activeScreen === "hud" && currentTripData && (

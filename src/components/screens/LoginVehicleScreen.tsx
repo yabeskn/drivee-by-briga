@@ -61,6 +61,16 @@ const DEFAULT_VEHICLES: EVVehicle[] = [
 	},
 ];
 
+export interface ActiveDriverShift {
+	shiftId: string;
+	vehicle: EVVehicle;
+	startTime: string;
+	tripsCount: number;
+	lastDropoffLocation?: { lat: number; lng: number };
+	lastOdo: number;
+	lastSoc: number;
+}
+
 interface LoginVehicleScreenProps {
 	onStartTrip: (config: {
 		vehicle: EVVehicle;
@@ -70,16 +80,20 @@ interface LoginVehicleScreenProps {
 		/** Hasil validasi geofence Hub Briga.id (lolos saat Start Trip) */
 		geofence: HubGeofenceResult;
 	}) => void;
+	activeShift?: ActiveDriverShift | null;
+	onCheckoutShift?: () => void;
 }
 
-export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
-	const [step, setStep] = useState<"auth" | "vehicle" | "ready">("auth");
+export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }: LoginVehicleScreenProps) {
+	const [step, setStep] = useState<"auth" | "vehicle" | "ready">(() => {
+		return activeShift ? "ready" : "auth";
+	});
 	const [phone, setPhone] = useState("");
 	const [pin, setPin] = useState("");
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
-	const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle | null>(
-		null,
-	);
+	const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle | null>(() => {
+		return activeShift?.vehicle ?? null;
+	});
 	const [vehicles, setVehicles] = useState<EVVehicle[]>(DEFAULT_VEHICLES);
 	const [isCheckingGeofence, setIsCheckingGeofence] = useState(false);
 	const [geofenceError, setGeofenceError] = useState<string | null>(null);
@@ -88,7 +102,9 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 		supabase.auth.getSession().then(({ data: { session } }) => {
 			if (session?.user) {
 				setIsLoggedIn(true);
-				setStep("vehicle");
+				if (!activeShift) {
+					setStep("vehicle");
+				}
 				const driverName =
 					session.user.user_metadata?.full_name ||
 					session.user.email ||
@@ -99,10 +115,14 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 				}
 			}
 		});
-	}, []);
+	}, [activeShift]);
 
-	const [initialSoc, setInitialSoc] = useState<number>(0);
-	const [initialOdo, setInitialOdo] = useState<number>(0);
+	const [initialSoc, setInitialSoc] = useState<number>(() => {
+		return activeShift?.lastSoc ?? 0;
+	});
+	const [initialOdo, setInitialOdo] = useState<number>(() => {
+		return activeShift?.lastOdo ?? 0;
+	});
 	const [corridor, setCorridor] = useState("");
 	const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
 	const [isVisionModalOpen, setIsVisionModalOpen] = useState(false);
@@ -153,10 +173,13 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 		setIsCheckingGeofence(true);
 		setGeofenceError(null);
 		try {
-			const geofence = await checkHubGeofence();
+			const geofence = await checkHubGeofence({
+				isSubsequentTrip: Boolean(activeShift),
+				lastDropoffLocation: activeShift?.lastDropoffLocation,
+			});
 			if (!geofence.allowed) {
 				setGeofenceError(
-					`Trip ditolak: ${geofence.reason}. Datang ke Hub terdekat untuk memulai shift.`,
+					`Trip ditolak: ${geofence.reason}. Pastikan armada berada di dalam wilayah koridor operasional resmi.`,
 				);
 				return;
 			}
@@ -164,7 +187,7 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 				vehicle: selectedVehicle,
 				startSoc: initialSoc,
 				startOdo: initialOdo,
-				corridor,
+				corridor: corridor || geofence.corridorName || "Koridor Jabodetabek",
 				geofence,
 			});
 		} catch (err) {
@@ -482,6 +505,37 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 								Catat kondisi kendaraan sebelum perjalanan.
 							</p>
 						</div>
+
+						{/* Active Shift Multi-Trip Banner */}
+						{activeShift && (
+							<div className="mb-4 p-3 bg-gradient-to-r from-emerald-500/15 via-zinc-900 to-zinc-900 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+								<div className="flex items-center space-x-2.5">
+									<div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-xs">
+										#{activeShift.tripsCount + 1}
+									</div>
+									<div>
+										<div className="text-white text-xs font-semibold flex items-center gap-1.5">
+											<span>Trip Lanjutan (Shift Aktif)</span>
+											<span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+												{activeShift.vehicle.code}
+											</span>
+										</div>
+										<div className="text-[10px] text-zinc-400">
+											Armada siap jalan • Lokasi jemput bebas koridor
+										</div>
+									</div>
+								</div>
+								{onCheckoutShift && (
+									<button
+										type="button"
+										onClick={onCheckoutShift}
+										className="text-[10px] text-zinc-400 hover:text-rose-400 font-medium underline underline-offset-2 transition-colors"
+									>
+										Selesai Shift
+									</button>
+								)}
+							</div>
+						)}
 
 						<div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 mb-4 flex items-center justify-between">
 							<div>
