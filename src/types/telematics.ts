@@ -91,6 +91,11 @@ export interface EVVehicle {
   efficiencyKwhPer100Km: number;
   category: VehicleCategory;
   seats: number;
+  bluetoothName?: string;
+  rentalPartnerName?: string;
+  rentalPartnerPhone?: string;
+  qrCodeToken?: string;
+  lastOdometerKm?: number;
 }
 
 export interface ActiveDrivingTelemetry {

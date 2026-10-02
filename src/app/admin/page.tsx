@@ -23,8 +23,10 @@ import {
   Check,
   X,
   Battery,
+  Car,
 } from 'lucide-react';
 import { BrigaCoinObservability } from '@/components/admin/BrigaCoinObservability';
+import { FleetManagementTab } from '@/components/admin/FleetManagementTab';
 
 // Dynamic import for Leaflet (SSR-incompatible)
 const TripMap = dynamic(
@@ -194,7 +196,7 @@ const MOCK_RAW_GPS: [number, number][] = [
 ];
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'trips' | 'brigacoin'>('trips');
+  const [activeTab, setActiveTab] = useState<'trips' | 'brigacoin' | 'fleet'>('trips');
   const [tripList, setTripList] = useState<AdminTrip[]>(MOCK_VERIFIED_TRIPS);
   const [selectedTrip, setSelectedTrip] = useState<AdminTrip>(MOCK_VERIFIED_TRIPS[0]);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED'>('ALL');
@@ -369,6 +371,17 @@ export default function AdminDashboard() {
           >
             <Coins className="w-4 h-4" />
             BrigaCoin Observability & Rekonsiliasi
+          </button>
+          <button
+            onClick={() => setActiveTab('fleet')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-colors ${
+              activeTab === 'fleet'
+                ? 'bg-zinc-800 text-emerald-400 border border-zinc-700'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+            }`}
+          >
+            <Car className="w-4 h-4" />
+            Armada EV & Rental
           </button>
         </div>
 
@@ -683,8 +696,10 @@ export default function AdminDashboard() {
           </div>
         </div>
         </>
-      ) : (
+      ) : activeTab === 'brigacoin' ? (
         <BrigaCoinObservability />
+      ) : (
+        <FleetManagementTab />
       )}
       </div>
     </div>

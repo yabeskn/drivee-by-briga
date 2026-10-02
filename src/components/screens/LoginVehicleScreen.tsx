@@ -15,12 +15,18 @@ import {
 	ShieldCheck,
 	Sparkles,
 	TriangleAlert,
+	Radio,
+	QrCode,
+	Camera,
+	Bluetooth,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { checkHubGeofence, type HubGeofenceResult } from "@/lib/geofence";
 import { supabase } from "@/lib/supabase/client";
 import type { EVVehicle } from "@/types/telematics";
+import { SpeedometerCaptureModal } from "@/components/vehicle/SpeedometerCaptureModal";
+import { VehicleScannerModal } from "@/components/vehicle/VehicleScannerModal";
 
 const DEFAULT_VEHICLES: EVVehicle[] = [
 	{
@@ -98,6 +104,24 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 	const [initialSoc, setInitialSoc] = useState<number>(0);
 	const [initialOdo, setInitialOdo] = useState<number>(0);
 	const [corridor, setCorridor] = useState("");
+	const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+	const [isVisionModalOpen, setIsVisionModalOpen] = useState(false);
+	const [aiVerifiedEvidence, setAiVerifiedEvidence] = useState<{
+		odo: number;
+		soc: number;
+		image: string;
+	} | null>(null);
+
+	useEffect(() => {
+		fetch('/api/admin/vehicles')
+			.then((res) => res.json())
+			.then((data) => {
+				if (data.success && Array.isArray(data.vehicles) && data.vehicles.length > 0) {
+					setVehicles(data.vehicles);
+				}
+			})
+			.catch(() => {});
+	}, []);
 
 	const handleLogin = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -341,6 +365,23 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 							</p>
 						</div>
 
+						{/* Auto-Detect Physical Vehicle Button */}
+						<div className="mb-4">
+							<button
+								type="button"
+								onClick={() => setIsScannerModalOpen(true)}
+								className="w-full py-2.5 px-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-between text-xs font-medium transition-colors"
+							>
+								<div className="flex items-center space-x-2">
+									<Radio className="w-4 h-4 text-emerald-400" />
+									<span>Deteksi Fisik Mobil (NFC / QR / Bluetooth)</span>
+								</div>
+								<span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+									Auto-Detect
+								</span>
+							</button>
+						</div>
+
 						<div className="space-y-3">
 							{vehicles.length === 0 ? (
 								<div className="text-center py-8">
@@ -462,6 +503,47 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 								Ganti
 							</button>
 						</div>
+
+						{/* AI Speedometer Scan Trigger Button */}
+						<div className="mb-4">
+							<button
+								type="button"
+								onClick={() => setIsVisionModalOpen(true)}
+								className="w-full py-3 px-3.5 rounded-xl bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-cyan-500/15 border border-emerald-500/40 hover:border-emerald-500 text-emerald-300 flex items-center justify-between text-xs font-semibold transition-all shadow-md group"
+							>
+								<div className="flex items-center space-x-2.5">
+									<div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+										<Camera className="w-4 h-4" />
+									</div>
+									<div className="text-left">
+										<div className="text-white text-xs font-semibold flex items-center gap-1.5">
+											<span>Scan Speedometer AI</span>
+											<Sparkles className="w-3 h-3 text-emerald-400" />
+										</div>
+										<div className="text-[10px] text-zinc-400 font-normal">
+											Isi otomatis Odo & Baterai dari foto cluster
+										</div>
+									</div>
+								</div>
+								<span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+									Laya Vision
+								</span>
+							</button>
+						</div>
+
+						{aiVerifiedEvidence && (
+							<div className="mb-4 p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between text-xs text-emerald-400">
+								<div className="flex items-center space-x-2">
+									<CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+									<span className="text-[11px] font-medium">
+										Terverifikasi AI: Odo {aiVerifiedEvidence.odo.toLocaleString('id-ID')} km • Baterai {aiVerifiedEvidence.soc}%
+									</span>
+								</div>
+								<span className="text-[10px] font-mono bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300">
+									Terkunci
+								</span>
+							</div>
+						)}
 
 						<div className="space-y-3.5 mb-5">
 							<div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3">
@@ -599,6 +681,32 @@ export function LoginVehicleScreen({ onStartTrip }: LoginVehicleScreenProps) {
 					</div>
 				</div>
 			)}
+
+			{/* Vehicle Physical Scanner Modal (NFC / QR / Bluetooth) */}
+			<VehicleScannerModal
+				isOpen={isScannerModalOpen}
+				onClose={() => setIsScannerModalOpen(false)}
+				availableVehicles={vehicles}
+				onVehicleSelected={(veh) => {
+					handleSelectVehicle(veh);
+				}}
+			/>
+
+			{/* Speedometer AI Vision Modal */}
+			<SpeedometerCaptureModal
+				isOpen={isVisionModalOpen}
+				onClose={() => setIsVisionModalOpen(false)}
+				vehicleCode={selectedVehicle?.code || "EV-01"}
+				onSuccess={(result) => {
+					setInitialOdo(result.odometerKm);
+					setInitialSoc(result.batterySoc);
+					setAiVerifiedEvidence({
+						odo: result.odometerKm,
+						soc: result.batterySoc,
+						image: result.imageBase64,
+					});
+				}}
+			/>
 		</div>
 	);
 }

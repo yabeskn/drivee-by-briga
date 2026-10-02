@@ -43,6 +43,20 @@ export const BRIGA_HUBS: Hub[] = [
 	},
 ];
 
+/**
+ * Koridor Operasional Desentralisasi (Model Kemitraan Armada Tanpa Pool Tetap)
+ * Mencakup koridor operasional Jabodetabek, Cikarang, Karawang, dan sekitarnya.
+ */
+export const DECENTRALIZED_SERVICE_CORRIDORS: Hub[] = [
+	{
+		id: "koridor-jabodetabek-cikarang",
+		name: "Koridor Layanan Jabodetabek & Cikarang",
+		lat: -6.285,
+		lng: 107.05,
+		radiusMeters: 90_000, // 90 km mencakup seluruh koridor operasional
+	},
+];
+
 function haversineMeters(
 	lat1: number,
 	lng1: number,
@@ -75,18 +89,21 @@ interface GeofenceOptions {
 	hubs?: Hub[];
 	/** Timeout GPS dalam ms — default 10s */
 	timeoutMs?: number;
+	/** Izinkan koridor operasional desentralisasi (tanpa pool tetap) */
+	allowDecentralized?: boolean;
 }
 
 /**
- * Validasi geofence asinkron terhadap semua hub.
+ * Validasi geofence asinkron terhadap hub/koridor layanan.
  * - Mengambil posisi via getCurrentPosition (async, tidak memblokir UI)
- * - allowed = true jika dalam radius salah satu hub
+ * - allowed = true jika dalam radius salah satu hub atau koridor desentralisasi
  * - Jika GPS gagal/timeout → allowed = false (fail-closed untuk security)
  */
 export async function checkHubGeofence(
 	options: GeofenceOptions = {},
 ): Promise<HubGeofenceResult> {
-	const hubs = options.hubs ?? BRIGA_HUBS;
+	const allowDecentralized = options.allowDecentralized ?? true;
+	const hubs = options.hubs ?? (allowDecentralized ? [...BRIGA_HUBS, ...DECENTRALIZED_SERVICE_CORRIDORS] : BRIGA_HUBS);
 	const timeoutMs = options.timeoutMs ?? 10_000;
 
 	if (typeof navigator === "undefined" || !navigator.geolocation) {
