@@ -7,6 +7,10 @@
 /coverage
 /test-results/
 /playwright-report/
+/blob-report/
+/.playwright/
+playwright/.cache/
+.vitest-cache/
 
 # Next.js
 /.next/
@@ -25,13 +29,14 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
-# Local env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Environment / secrets
+# NOTE: catch-all — file .env apa pun tidak boleh masuk repo.
+# Template dikecualikan supaya tetap bisa dipakai tim.
+.env*
+!.env.example
+!.env.production.example
 
 # Vercel
 .vercel
@@ -40,14 +45,53 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Build/tool caches
+.cache/
+.turbo/
+.eslintcache
+.stylelintcache
+
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 Thumbs.db
+.DS_Store
+
+# Screenshot & artefak visual hasil test
+screenshots/
+e2e/screenshots/
+test-assets/generated/
+
+# Supabase CLI (state lokal mesin: ref, pooler-url, linked-project)
+# File di sini SUDAH di-untrack (git rm --cached) supaya tidak ikut ter-commit.
+supabase/.temp/
+.branches/
+
+# WhatsApp / Baileys session — JANGAN pernah di-commit
+.baileys/
+baileys-auth*/
+auth_info_*.json
+*.session
+creds.json
+
+# Scratch / temporary files
+.tmp-*
+*.tmp
+*.bak
+*.orig
+*.rej
+*.patch
+*.diff
+
+# Agent tooling state (machine-local)
+# CATATAN: .freebuff/ juga ada di .git/info/exclude; dicantumkan di sini
+# supaya anggota tim lain ikut mengabaikannya.
+.freebuff/
 
 # Agent workflow files (Codebuff teamwork briefings & dispatches)
 # NOTE: .agents/skills/ tetap di-track agar dibagikan ke tim
