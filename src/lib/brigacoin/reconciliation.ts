@@ -6,146 +6,156 @@
 // sum of immutable ledger entries in `brigacoin_transactions`.
 // ─────────────────────────────────────────────────────────────
 
-import { supabaseAdmin, isAdminConfigured } from '@/lib/supabase/server';
-import { getBalance, getAllBalances, getTransactions, mutateMemoryAdjust } from './balance';
-import { captureMessage, addBreadcrumb } from '@/lib/sentry';
+import { addBreadcrumb, captureMessage } from "@/lib/sentry";
+import { isAdminConfigured, supabaseAdmin } from "@/lib/supabase/server";
+import {
+	getAllBalances,
+	getBalance,
+	getTransactions,
+	mutateMemoryAdjust,
+} from "./balance";
 
 export interface UserReconciliationResult {
-  userId: string;
-  snapshotBalance: number;
-  ledgerSum: number;
-  drift: number;
-  status: 'synced' | 'drift_detected';
-  reconciledAt: string;
-  fixed?: boolean;
+	userId: string;
+	snapshotBalance: number;
+	ledgerSum: number;
+	drift: number;
+	status: "synced" | "drift_detected";
+	reconciledAt: string;
+	fixed?: boolean;
 }
 
 export interface SystemReconciliationReport {
-  timestamp: string;
-  totalUsersAudited: number;
-  syncedCount: number;
-  driftCount: number;
-  totalDriftAmount: number;
-  discrepancies: UserReconciliationResult[];
-  alertTriggered?: boolean;
+	timestamp: string;
+	totalUsersAudited: number;
+	syncedCount: number;
+	driftCount: number;
+	totalDriftAmount: number;
+	discrepancies: UserReconciliationResult[];
+	alertTriggered?: boolean;
 }
 
 export async function reconcileUserBalance(
-  userId: string,
-  autoFix = false
+	userId: string,
+	autoFix = false,
 ): Promise<UserReconciliationResult> {
-  const current = await getBalance(userId);
-  const txns = await getTransactions(userId);
-  const ledgerSum = txns.reduce((sum, t) => sum + t.amount, 0);
+	const current = await getBalance(userId);
+	const txns = await getTransactions(userId);
+	const ledgerSum = txns.reduce((sum, t) => sum + t.amount, 0);
 
-  const drift = current.balance - ledgerSum;
-  const status = drift === 0 ? 'synced' : 'drift_detected';
-  let fixed = false;
+	const drift = current.balance - ledgerSum;
+	const status = drift === 0 ? "synced" : "drift_detected";
+	let fixed = false;
 
-  // Auto-fix if requested and drift is detected
-  if (status === 'drift_detected' && autoFix) {
-    try {
-      // adjustmentAmount = drift (ledgerSum + drift = current.balance)
-      const adjustmentAmount = drift;
-      const description = `Automated ledger reconciliation: realigned drift of ${drift} BRC`;
+	// Auto-fix if requested and drift is detected
+	if (status === "drift_detected" && autoFix) {
+		try {
+			// adjustmentAmount = drift (ledgerSum + drift = current.balance)
+			const adjustmentAmount = drift;
+			const description = `Automated ledger reconciliation: realigned drift of ${drift} BRC`;
 
-      // Update in-memory store
-      mutateMemoryAdjust(userId, adjustmentAmount, description, 'system');
+			// Update in-memory store
+			mutateMemoryAdjust(userId, adjustmentAmount, description, "system");
 
-      if (isAdminConfigured()) {
-        try {
-          await (supabaseAdmin as unknown as {
-            from: (table: string) => {
-              insert: (values: Record<string, unknown>) => Promise<void>;
-            };
-          })
-            .from('brigacoin_transactions')
-            .insert({
-              user_id: userId,
-              driver_id: userId,
-              type: 'adjust',
-              amount: adjustmentAmount,
-              balance_after: current.balance,
-              source: 'adjustment',
-              description,
-              actor: 'system',
-            });
-        } catch {
-          // Supabase remote insert error ignored in offline / test mock
-        }
-      }
-      fixed = true;
-    } catch (err) {
-      console.error(`[Reconciliation] Failed to auto-fix drift for ${userId}:`, err);
-    }
-  }
+			if (isAdminConfigured()) {
+				try {
+					await (
+						supabaseAdmin as unknown as {
+							from: (table: string) => {
+								insert: (values: Record<string, unknown>) => Promise<void>;
+							};
+						}
+					)
+						.from("brigacoin_transactions")
+						.insert({
+							user_id: userId,
+							driver_id: userId,
+							type: "adjust",
+							amount: adjustmentAmount,
+							balance_after: current.balance,
+							source: "adjustment",
+							description,
+							actor: "system",
+						});
+				} catch {
+					// Supabase remote insert error ignored in offline / test mock
+				}
+			}
+			fixed = true;
+		} catch (err) {
+			console.error(
+				`[Reconciliation] Failed to auto-fix drift for ${userId}:`,
+				err,
+			);
+		}
+	}
 
-  return {
-    userId,
-    snapshotBalance: current.balance,
-    ledgerSum,
-    drift,
-    status,
-    reconciledAt: new Date().toISOString(),
-    fixed,
-  };
+	return {
+		userId,
+		snapshotBalance: current.balance,
+		ledgerSum,
+		drift,
+		status,
+		reconciledAt: new Date().toISOString(),
+		fixed,
+	};
 }
 
 export async function runSystemReconciliation(
-  autoFix = false
+	autoFix = false,
 ): Promise<SystemReconciliationReport> {
-  const all = await getAllBalances();
-  const discrepancies: UserReconciliationResult[] = [];
-  let syncedCount = 0;
-  let driftCount = 0;
-  let totalDriftAmount = 0;
+	const all = await getAllBalances();
+	const discrepancies: UserReconciliationResult[] = [];
+	let syncedCount = 0;
+	let driftCount = 0;
+	let totalDriftAmount = 0;
 
-  for (const item of all) {
-    const res = await reconcileUserBalance(item.driverId, autoFix);
-    if (res.status === 'drift_detected') {
-      driftCount++;
-      totalDriftAmount += Math.abs(res.drift);
-      discrepancies.push(res);
-    } else {
-      syncedCount++;
-    }
-  }
+	for (const item of all) {
+		const res = await reconcileUserBalance(item.driverId, autoFix);
+		if (res.status === "drift_detected") {
+			driftCount++;
+			totalDriftAmount += Math.abs(res.drift);
+			discrepancies.push(res);
+		} else {
+			syncedCount++;
+		}
+	}
 
-  let alertTriggered = false;
-  if (driftCount > 0) {
-    alertTriggered = true;
-    addBreadcrumb({
-      category: 'reconciliation',
-      message: `System reconciliation detected ${driftCount} drifted accounts`,
-      level: 'error',
-      data: { driftCount, totalDriftAmount },
-    });
+	let alertTriggered = false;
+	if (driftCount > 0) {
+		alertTriggered = true;
+		addBreadcrumb({
+			category: "reconciliation",
+			message: `System reconciliation detected ${driftCount} drifted accounts`,
+			level: "error",
+			data: { driftCount, totalDriftAmount },
+		});
 
-    await captureMessage(
-      `[CRITICAL RECONCILIATION ALERT] Detected ${driftCount} accounts with ledger drift totaling ${totalDriftAmount} BRC`,
-      {
-        level: 'error',
-        tags: {
-          feature: 'brigacoin-reconciliation',
-          driftCount: String(driftCount),
-          autoFix: String(autoFix),
-        },
-        extra: {
-          totalUsersAudited: all.length,
-          totalDriftAmount,
-          discrepancies: discrepancies.slice(0, 10),
-        },
-      }
-    );
-  }
+		await captureMessage(
+			`[CRITICAL RECONCILIATION ALERT] Detected ${driftCount} accounts with ledger drift totaling ${totalDriftAmount} BRC`,
+			{
+				level: "error",
+				tags: {
+					feature: "brigacoin-reconciliation",
+					driftCount: String(driftCount),
+					autoFix: String(autoFix),
+				},
+				extra: {
+					totalUsersAudited: all.length,
+					totalDriftAmount,
+					discrepancies: discrepancies.slice(0, 10),
+				},
+			},
+		);
+	}
 
-  return {
-    timestamp: new Date().toISOString(),
-    totalUsersAudited: all.length,
-    syncedCount,
-    driftCount,
-    totalDriftAmount,
-    discrepancies,
-    alertTriggered,
-  };
+	return {
+		timestamp: new Date().toISOString(),
+		totalUsersAudited: all.length,
+		syncedCount,
+		driftCount,
+		totalDriftAmount,
+		discrepancies,
+		alertTriggered,
+	};
 }

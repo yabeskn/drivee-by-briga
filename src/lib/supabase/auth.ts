@@ -13,7 +13,7 @@ export async function signInWithGoogle(nextPath?: string): Promise<{
 }> {
 	try {
 		const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-		const target = nextPath && nextPath.startsWith('/') ? nextPath : '/commuter';
+		const target = nextPath?.startsWith("/") ? nextPath : "/commuter";
 		const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent(target)}`;
 
 		const { error } = await supabase.auth.signInWithOAuth({
@@ -32,6 +32,7 @@ export async function signInWithGoogle(nextPath?: string): Promise<{
 export async function signOut(): Promise<void> {
 	try {
 		await supabase.auth.signOut();
+		await fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
 	} catch (err) {
 		console.error("Supabase signOut error:", err);
 	} finally {
@@ -40,9 +41,13 @@ export async function signOut(): Promise<void> {
 			localStorage.removeItem("drivee_name");
 			localStorage.removeItem("drivee_driver_id");
 			localStorage.removeItem("drivee_vehicle_id");
-			// Clear session cookies
+			// Clear session cookies. Menghapus cookie HANYA bisa lewat
+			// document.cookie (server tidak bisa meng-expire cookie client),
+			// jadi akses ini disengaja di sisi klien.
+			// biome-ignore lint/suspicious/noDocumentCookie: hanya cara klien menghapus cookie
 			document.cookie =
 				"sb-access-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+			// biome-ignore lint/suspicious/noDocumentCookie: hanya cara klien menghapus cookie
 			document.cookie =
 				"sb-refresh-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
 		}

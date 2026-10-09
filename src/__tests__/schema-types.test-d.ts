@@ -117,8 +117,16 @@ export const validTripRow: TripRow = {
 	revenue_distance_km: 14.3,
 	trip_phase_timeline: [
 		{ from: "IDLE", to: "DISPATCHED", at: "2026-09-30T07:52:00Z" },
-		{ from: "DISPATCHED", to: "PASSENGER_PICKED_UP", at: "2026-09-30T08:00:00Z" },
-		{ from: "PASSENGER_PICKED_UP", to: "COMPLETED", at: "2026-09-30T08:35:00Z" },
+		{
+			from: "DISPATCHED",
+			to: "PASSENGER_PICKED_UP",
+			at: "2026-09-30T08:00:00Z",
+		},
+		{
+			from: "PASSENGER_PICKED_UP",
+			to: "COMPLETED",
+			at: "2026-09-30T08:35:00Z",
+		},
 	],
 	watchdog_flagged: false,
 	watchdog_anomaly_reason: null,

@@ -7,6 +7,7 @@
     "@types/react-dom": "^18.3.7",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
+    "pg": "^8.23.1",
     "vitest": "^5.0.3"
   },
   "dependencies": {
@@ -39,6 +40,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint": "biome check src tests e2e scripts",
+    "lint:fix": "biome check --write src tests e2e scripts",
     "report:payout": "node scripts/daily-payout-reporter.mjs",
     "prepare": "husky"
   }

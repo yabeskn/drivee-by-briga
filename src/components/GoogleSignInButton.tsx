@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { SupabaseSignInButton } from './SupabaseSignInButton';
+import { SupabaseSignInButton } from "./SupabaseSignInButton";
 
 export function GoogleSignInButton() {
-  return <SupabaseSignInButton />;
+	return <SupabaseSignInButton />;
 }

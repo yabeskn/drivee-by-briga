@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type EntityTable } from "dexie";
 
 // ─────────────────────────────────────────────────────────────
 // IndexedDB Schema  –  Dexie.js v4 (class-based)
@@ -9,72 +9,72 @@ import Dexie, { type EntityTable } from 'dexie';
 
 /** Satu titik telematik yang dikirim ke IndexedDB setiap batch-write */
 export interface TelemetryPoint {
-  id?: number;              // auto-increment PK
-  tripId: string;           // foreign-key ke trip session
-  timestamp: number;        // Date.now() epoch ms
-  lat: number;
-  lng: number;
-  accuracy: number;         // GPS accuracy (meters)
-  speedMps: number;         // m/s dari Geolocation API (bisa NaN)
-  speedKmh: number;         // kalkulasi manual km/h
-  heading: number | null;
-  altitude: number | null;
-  accelX: number;           // DeviceMotion x-axis m/s²
-  accelY: number;           // DeviceMotion y-axis m/s²
-  accelZ: number;           // DeviceMotion z-axis m/s²
-  accelMagnitude: number;   // √(x²+y²+z²) total G-force
-  pollingIntervalMs: number; // interval aktif saat titik diambil
-  isAccelPaused: boolean;   // true jika accel di-pause (idle >1min)
-  drivingStatus: 'smooth' | 'harsh_accel' | 'sudden_brake' | 'idle';
-  // Estimasi baterai per-titik (sejak DISPATCHED; null saat kapasitas
-  // kendaraan / SoC awal tidak diketahui)
-  batterySoc: number | null; // SoC % pada titik ini (estimasi integrasi)
-  powerKw: number | null;    // daya rata-rata kW sejak titik sebelumnya
+	id?: number; // auto-increment PK
+	tripId: string; // foreign-key ke trip session
+	timestamp: number; // Date.now() epoch ms
+	lat: number;
+	lng: number;
+	accuracy: number; // GPS accuracy (meters)
+	speedMps: number; // m/s dari Geolocation API (bisa NaN)
+	speedKmh: number; // kalkulasi manual km/h
+	heading: number | null;
+	altitude: number | null;
+	accelX: number; // DeviceMotion x-axis m/s²
+	accelY: number; // DeviceMotion y-axis m/s²
+	accelZ: number; // DeviceMotion z-axis m/s²
+	accelMagnitude: number; // √(x²+y²+z²) total G-force
+	pollingIntervalMs: number; // interval aktif saat titik diambil
+	isAccelPaused: boolean; // true jika accel di-pause (idle >1min)
+	drivingStatus: "smooth" | "harsh_accel" | "sudden_brake" | "idle";
+	// Estimasi baterai per-titik (sejak DISPATCHED; null saat kapasitas
+	// kendaraan / SoC awal tidak diketahui)
+	batterySoc: number | null; // SoC % pada titik ini (estimasi integrasi)
+	powerKw: number | null; // daya rata-rata kW sejak titik sebelumnya
 }
 
 /** Metadata sesi trip — satu record per trip */
 export interface TripSession {
-  id?: number;
-  tripId: string;            // UUID unik
-  driverId: string;
-  vehicleId: string;
-  startedAt: number;         // epoch ms
-  endedAt?: number;
-  totalPoints: number;
-  totalDistanceKm: number;
-  status: 'active' | 'completed' | 'synced';
+	id?: number;
+	tripId: string; // UUID unik
+	driverId: string;
+	vehicleId: string;
+	startedAt: number; // epoch ms
+	endedAt?: number;
+	totalPoints: number;
+	totalDistanceKm: number;
+	status: "active" | "completed" | "synced";
 }
 
 /** Offline queue entry — pengganti localStorage (no 5MB limit) */
 export interface OfflineQueueEntry {
-  id?: number;
-  tripId: string;
-  payload: string;           // JSON.stringify'd payload (to avoid Dexie clone issues)
-  createdAt: number;
-  retryCount: number;
-  status: 'pending' | 'syncing' | 'failed';
+	id?: number;
+	tripId: string;
+	payload: string; // JSON.stringify'd payload (to avoid Dexie clone issues)
+	createdAt: number;
+	retryCount: number;
+	status: "pending" | "syncing" | "failed";
 }
 
 class BrigaTelematicsDB extends Dexie {
-  telemetryPoints!: EntityTable<TelemetryPoint, 'id'>;
-  tripSessions!: EntityTable<TripSession, 'id'>;
-  offlineQueue!: EntityTable<OfflineQueueEntry, 'id'>;
+	telemetryPoints!: EntityTable<TelemetryPoint, "id">;
+	tripSessions!: EntityTable<TripSession, "id">;
+	offlineQueue!: EntityTable<OfflineQueueEntry, "id">;
 
-  constructor() {
-    super('briga_telematics');
+	constructor() {
+		super("briga_telematics");
 
-    this.version(1).stores({
-      telemetryPoints: '++id, tripId, timestamp, drivingStatus',
-      tripSessions: '++id, tripId, driverId, vehicleId, status',
-    });
+		this.version(1).stores({
+			telemetryPoints: "++id, tripId, timestamp, drivingStatus",
+			tripSessions: "++id, tripId, driverId, vehicleId, status",
+		});
 
-    // v2: Add offline queue table (IndexedDB-backed, no 5MB localStorage limit)
-    this.version(2).stores({
-      telemetryPoints: '++id, tripId, timestamp, drivingStatus',
-      tripSessions: '++id, tripId, driverId, vehicleId, status',
-      offlineQueue: '++id, tripId, status, createdAt',
-    });
-  }
+		// v2: Add offline queue table (IndexedDB-backed, no 5MB localStorage limit)
+		this.version(2).stores({
+			telemetryPoints: "++id, tripId, timestamp, drivingStatus",
+			tripSessions: "++id, tripId, driverId, vehicleId, status",
+			offlineQueue: "++id, tripId, status, createdAt",
+		});
+	}
 }
 
 /** Singleton database instance */
@@ -86,20 +86,19 @@ export const db = new BrigaTelematicsDB();
 
 /** Get all telemetry points for a trip, sorted by timestamp */
 export async function getTripPoints(tripId: string): Promise<TelemetryPoint[]> {
-  return db.telemetryPoints
-    .where('tripId')
-    .equals(tripId)
-    .sortBy('timestamp');
+	return db.telemetryPoints.where("tripId").equals(tripId).sortBy("timestamp");
 }
 
 /** Count total points stored for a trip */
 export async function countTripPoints(tripId: string): Promise<number> {
-  return db.telemetryPoints.where('tripId').equals(tripId).count();
+	return db.telemetryPoints.where("tripId").equals(tripId).count();
 }
 
 /** Get a trip session by tripId */
-export async function getTripSession(tripId: string): Promise<TripSession | undefined> {
-  return db.tripSessions.where('tripId').equals(tripId).first();
+export async function getTripSession(
+	tripId: string,
+): Promise<TripSession | undefined> {
+	return db.tripSessions.where("tripId").equals(tripId).first();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -110,10 +109,10 @@ export async function getTripSession(tripId: string): Promise<TripSession | unde
 // ─────────────────────────────────────────────────────────────
 
 export interface PurgeResult {
-  tripId: string;
-  pointsDeleted: number;
-  sessionUpdated: boolean;
-  purgedAt: number;
+	tripId: string;
+	pointsDeleted: number;
+	sessionUpdated: boolean;
+	purgedAt: number;
 }
 
 /**
@@ -121,77 +120,79 @@ export interface PurgeResult {
  * Keeps the TripSession record (with status='synced') as audit trail.
  */
 export async function purgeVerifiedTrip(tripId: string): Promise<PurgeResult> {
-  // 1. Count points before delete
-  const count = await countTripPoints(tripId);
+	// 1. Count points before delete
+	const _count = await countTripPoints(tripId);
 
-  // 2. Delete all telemetry points for this trip
-  const deleted = await db.telemetryPoints
-    .where('tripId')
-    .equals(tripId)
-    .delete();
+	// 2. Delete all telemetry points for this trip
+	const deleted = await db.telemetryPoints
+		.where("tripId")
+		.equals(tripId)
+		.delete();
 
-  // 3. Update session status to 'synced'
-  let sessionUpdated = false;
-  const session = await getTripSession(tripId);
-  if (session?.id != null) {
-    await db.tripSessions.update(session.id, { status: 'synced' });
-    sessionUpdated = true;
-  }
+	// 3. Update session status to 'synced'
+	let sessionUpdated = false;
+	const session = await getTripSession(tripId);
+	if (session?.id != null) {
+		await db.tripSessions.update(session.id, { status: "synced" });
+		sessionUpdated = true;
+	}
 
-  return {
-    tripId,
-    pointsDeleted: deleted,
-    sessionUpdated,
-    purgedAt: Date.now(),
-  };
+	return {
+		tripId,
+		pointsDeleted: deleted,
+		sessionUpdated,
+		purgedAt: Date.now(),
+	};
 }
 
 /**
  * Purge ALL completed+synced trips older than maxAgeMs.
  * Safety net for accumulated data from multiple past trips.
  */
-export async function purgeOldTrips(maxAgeMs: number = 24 * 60 * 60 * 1000): Promise<number> {
-  const cutoff = Date.now() - maxAgeMs;
+export async function purgeOldTrips(
+	maxAgeMs: number = 24 * 60 * 60 * 1000,
+): Promise<number> {
+	const cutoff = Date.now() - maxAgeMs;
 
-  // Find old synced sessions
-  const oldSessions = await db.tripSessions
-    .where('status')
-    .equals('synced')
-    .filter((s) => (s.endedAt ?? s.startedAt) < cutoff)
-    .toArray();
+	// Find old synced sessions
+	const oldSessions = await db.tripSessions
+		.where("status")
+		.equals("synced")
+		.filter((s) => (s.endedAt ?? s.startedAt) < cutoff)
+		.toArray();
 
-  let totalDeleted = 0;
-  for (const session of oldSessions) {
-    const deleted = await db.telemetryPoints
-      .where('tripId')
-      .equals(session.tripId)
-      .delete();
-    totalDeleted += deleted;
+	let totalDeleted = 0;
+	for (const session of oldSessions) {
+		const deleted = await db.telemetryPoints
+			.where("tripId")
+			.equals(session.tripId)
+			.delete();
+		totalDeleted += deleted;
 
-    // Optionally remove the session record itself
-    if (session.id != null) {
-      await db.tripSessions.delete(session.id);
-    }
-  }
+		// Optionally remove the session record itself
+		if (session.id != null) {
+			await db.tripSessions.delete(session.id);
+		}
+	}
 
-  return totalDeleted;
+	return totalDeleted;
 }
 
 /** Get total IndexedDB storage usage estimate (bytes) */
 export async function getStorageEstimate(): Promise<{
-  usageBytes: number;
-  quotaBytes: number;
-  usagePercent: number;
+	usageBytes: number;
+	quotaBytes: number;
+	usagePercent: number;
 }> {
-  if ('storage' in navigator && 'estimate' in navigator.storage) {
-    const est = await navigator.storage.estimate();
-    const usage = est.usage ?? 0;
-    const quota = est.quota ?? 1;
-    return {
-      usageBytes: usage,
-      quotaBytes: quota,
-      usagePercent: Math.round((usage / quota) * 10000) / 100,
-    };
-  }
-  return { usageBytes: 0, quotaBytes: 0, usagePercent: 0 };
+	if ("storage" in navigator && "estimate" in navigator.storage) {
+		const est = await navigator.storage.estimate();
+		const usage = est.usage ?? 0;
+		const quota = est.quota ?? 1;
+		return {
+			usageBytes: usage,
+			quotaBytes: quota,
+			usagePercent: Math.round((usage / quota) * 10000) / 100,
+		};
+	}
+	return { usageBytes: 0, quotaBytes: 0, usagePercent: 0 };
 }

@@ -21,7 +21,12 @@ export interface Hub {
 	lat: number;
 	lng: number;
 	radiusMeters: number;
-	zoneCategory?: 'airport' | 'business_district' | 'industrial' | 'transit_metro' | 'regional';
+	zoneCategory?:
+		| "airport"
+		| "business_district"
+		| "industrial"
+		| "transit_metro"
+		| "regional";
 }
 
 /**
@@ -34,7 +39,7 @@ export const BRIGA_HUBS: Hub[] = [
 		lat: -6.30816,
 		lng: 107.14987,
 		radiusMeters: 5_000,
-		zoneCategory: 'industrial',
+		zoneCategory: "industrial",
 	},
 	{
 		id: "halim",
@@ -42,7 +47,7 @@ export const BRIGA_HUBS: Hub[] = [
 		lat: -6.26652,
 		lng: 106.89033,
 		radiusMeters: 5_000,
-		zoneCategory: 'airport',
+		zoneCategory: "airport",
 	},
 	{
 		id: "soekarno-hatta-cgk",
@@ -50,7 +55,7 @@ export const BRIGA_HUBS: Hub[] = [
 		lat: -6.1256,
 		lng: 106.6559,
 		radiusMeters: 15_000,
-		zoneCategory: 'airport',
+		zoneCategory: "airport",
 	},
 	{
 		id: "pantai-indah-kapuk-pik",
@@ -58,7 +63,7 @@ export const BRIGA_HUBS: Hub[] = [
 		lat: -6.1086,
 		lng: 106.741,
 		radiusMeters: 15_000,
-		zoneCategory: 'business_district',
+		zoneCategory: "business_district",
 	},
 	{
 		id: "scbd-sudirman",
@@ -66,7 +71,7 @@ export const BRIGA_HUBS: Hub[] = [
 		lat: -6.2248,
 		lng: 106.809,
 		radiusMeters: 12_000,
-		zoneCategory: 'business_district',
+		zoneCategory: "business_district",
 	},
 	{
 		id: "kiic-karawang",
@@ -74,7 +79,7 @@ export const BRIGA_HUBS: Hub[] = [
 		lat: -6.345,
 		lng: 107.28,
 		radiusMeters: 25_000,
-		zoneCategory: 'industrial',
+		zoneCategory: "industrial",
 	},
 ];
 
@@ -89,7 +94,7 @@ export const DECENTRALIZED_SERVICE_CORRIDORS: Hub[] = [
 		lat: -6.225,
 		lng: 106.95,
 		radiusMeters: 100_000, // 100 km mencakup dari Banten/CGK hingga Karawang Timur
-		zoneCategory: 'regional',
+		zoneCategory: "regional",
 	},
 ];
 
@@ -138,8 +143,13 @@ export function calculateDeadheadKm(
 	lastDropoff: { lat: number; lng: number } | null | undefined,
 	currentPickup: { lat: number; lng: number },
 ): number {
-	if (!lastDropoff || !lastDropoff.lat || !lastDropoff.lng) return 0;
-	const distKm = haversineKm(lastDropoff.lat, lastDropoff.lng, currentPickup.lat, currentPickup.lng);
+	if (!lastDropoff?.lat || !lastDropoff.lng) return 0;
+	const distKm = haversineKm(
+		lastDropoff.lat,
+		lastDropoff.lng,
+		currentPickup.lat,
+		currentPickup.lng,
+	);
 	return Number(distKm.toFixed(2));
 }
 
@@ -166,7 +176,11 @@ export async function checkHubGeofence(
 	options: GeofenceOptions = {},
 ): Promise<HubGeofenceResult> {
 	const allowDecentralized = options.allowDecentralized ?? true;
-	const hubs = options.hubs ?? (allowDecentralized ? [...BRIGA_HUBS, ...DECENTRALIZED_SERVICE_CORRIDORS] : BRIGA_HUBS);
+	const hubs =
+		options.hubs ??
+		(allowDecentralized
+			? [...BRIGA_HUBS, ...DECENTRALIZED_SERVICE_CORRIDORS]
+			: BRIGA_HUBS);
 	const timeoutMs = options.timeoutMs ?? 10_000;
 
 	// Ambil koordinat posisi saat ini
@@ -187,32 +201,34 @@ export async function checkHubGeofence(
 			};
 		}
 
-		const position = await new Promise<GeolocationPosition | null>((resolve) => {
-			let settled = false;
-			const timer = setTimeout(() => {
-				if (!settled) {
-					settled = true;
-					resolve(null);
-				}
-			}, timeoutMs);
-			navigator.geolocation.getCurrentPosition(
-				(pos) => {
+		const position = await new Promise<GeolocationPosition | null>(
+			(resolve) => {
+				let settled = false;
+				const timer = setTimeout(() => {
 					if (!settled) {
 						settled = true;
-						clearTimeout(timer);
-						resolve(pos);
-					}
-				},
-				() => {
-					if (!settled) {
-						settled = true;
-						clearTimeout(timer);
 						resolve(null);
 					}
-				},
-				{ enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30_000 },
-			);
-		});
+				}, timeoutMs);
+				navigator.geolocation.getCurrentPosition(
+					(pos) => {
+						if (!settled) {
+							settled = true;
+							clearTimeout(timer);
+							resolve(pos);
+						}
+					},
+					() => {
+						if (!settled) {
+							settled = true;
+							clearTimeout(timer);
+							resolve(null);
+						}
+					},
+					{ enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30_000 },
+				);
+			},
+		);
 
 		if (!position) {
 			return {
@@ -230,7 +246,10 @@ export async function checkHubGeofence(
 	// ── Multi-Trip Logic: Hitung Deadhead jika ini trip lanjutan ──
 	let deadheadDistanceKm = 0;
 	if (options.isSubsequentTrip && options.lastDropoffLocation) {
-		deadheadDistanceKm = calculateDeadheadKm(options.lastDropoffLocation, { lat: latitude, lng: longitude });
+		deadheadDistanceKm = calculateDeadheadKm(options.lastDropoffLocation, {
+			lat: latitude,
+			lng: longitude,
+		});
 	}
 
 	// Toleransi akurasi GPS
@@ -254,7 +273,8 @@ export async function checkHubGeofence(
 			if (
 				!matchedHub ||
 				hub.radiusMeters < matchedHub.hub.radiusMeters ||
-				(hub.radiusMeters === matchedHub.hub.radiusMeters && dist < matchedHub.dist)
+				(hub.radiusMeters === matchedHub.hub.radiusMeters &&
+					dist < matchedHub.dist)
 			) {
 				matchedHub = { hub, dist };
 			}
@@ -271,7 +291,7 @@ export async function checkHubGeofence(
 
 	if (matchedHub) {
 		const reason = options.isSubsequentTrip
-			? `Trip lanjutan dalam radius ${matchedHub.hub.name}${deadheadDistanceKm > 0 ? ` (Deadhead: ${deadheadDistanceKm} km)` : ''}`
+			? `Trip lanjutan dalam radius ${matchedHub.hub.name}${deadheadDistanceKm > 0 ? ` (Deadhead: ${deadheadDistanceKm} km)` : ""}`
 			: `Dalam radius ${matchedHub.hub.name}`;
 
 		return {

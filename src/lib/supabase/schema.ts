@@ -5,6 +5,15 @@
 // types that mirror the database tables.
 // ─────────────────────────────────────────────────────────────
 
+/** Jenis event yang boleh dicatat di jejak audit aktivitas (migration 009) */
+export type ActivityLogType =
+	| "login"
+	| "trip"
+	| "verification"
+	| "app_usage"
+	| "error"
+	| "feature";
+
 export interface Database {
 	public: {
 		Tables: {
@@ -25,6 +34,25 @@ export interface Database {
 					bank_name?: string | null;
 					bank_account_number?: string | null;
 					bank_account_holder?: string | null;
+					/** Nama lengkap dari alur registrasi; `name` tetap jadi kolom utama (migration 009) */
+					full_name?: string | null;
+					/** Identitas pemerintahan (migration 009) */
+					ktp?: string | null;
+					sim_type?: string | null;
+					sim_number?: string | null;
+					sim_expiry?: string | null;
+					/** Alamat & kontak darurat (migration 009) */
+					address?: string | null;
+					emergency_name?: string | null;
+					emergency_phone?: string | null;
+					emergency_relation?: string | null;
+					/** Rekening & Surat Izin Mengendarai (migration 009) */
+					bank_other?: string | null;
+					license_type?: string | null;
+					license_number?: string | null;
+					license_expiry?: string | null;
+					/** Status vetting driver (migration 009) */
+					registration_status?: string | null;
 					created_at: string;
 					updated_at: string;
 				};
@@ -44,6 +72,20 @@ export interface Database {
 					bank_name?: string | null;
 					bank_account_number?: string | null;
 					bank_account_holder?: string | null;
+					full_name?: string | null;
+					ktp?: string | null;
+					sim_type?: string | null;
+					sim_number?: string | null;
+					sim_expiry?: string | null;
+					address?: string | null;
+					emergency_name?: string | null;
+					emergency_phone?: string | null;
+					emergency_relation?: string | null;
+					bank_other?: string | null;
+					license_type?: string | null;
+					license_number?: string | null;
+					license_expiry?: string | null;
+					registration_status?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -63,44 +105,157 @@ export interface Database {
 					bank_name?: string | null;
 					bank_account_number?: string | null;
 					bank_account_holder?: string | null;
+					full_name?: string | null;
+					ktp?: string | null;
+					sim_type?: string | null;
+					sim_number?: string | null;
+					sim_expiry?: string | null;
+					address?: string | null;
+					emergency_name?: string | null;
+					emergency_phone?: string | null;
+					emergency_relation?: string | null;
+					bank_other?: string | null;
+					license_type?: string | null;
+					license_number?: string | null;
+					license_expiry?: string | null;
+					registration_status?: string | null;
 					created_at?: string;
 					updated_at?: string;
+				};
+			};
+			activity_logs: {
+				Row: {
+					id: string;
+					driver_id: string | null;
+					type: ActivityLogType;
+					action: string;
+					status: string | null;
+					metadata: Record<string, unknown>;
+					ip_address: string | null;
+					user_agent: string | null;
+					created_at: string;
+				};
+				Insert: {
+					id?: string;
+					driver_id?: string | null;
+					type: ActivityLogType;
+					action: string;
+					status?: string | null;
+					metadata?: Record<string, unknown>;
+					ip_address?: string | null;
+					user_agent?: string | null;
+					created_at?: string;
+				};
+				Update: {
+					id?: string;
+					driver_id?: string | null;
+					type?: ActivityLogType;
+					action?: string;
+					status?: string | null;
+					metadata?: Record<string, unknown>;
+					ip_address?: string | null;
+					user_agent?: string | null;
+					created_at?: string;
 				};
 			};
 			vehicles: {
 				Row: {
 					id: string;
-					driver_id: string;
-					category: "standard" | "professional" | "premium" | "premium_plus";
-					brand: string;
-					model: string;
+					code: string | null;
+					name: string;
+					driver_id: string | null;
+					category:
+						| "standard"
+						| "professional"
+						| "premium"
+						| "premium_plus"
+						| null;
+					brand: string | null;
+					model: string | null;
 					license_plate: string;
-					battery_capacity_kwh: number;
-					status: "active" | "inactive";
+					battery_capacity_kwh: number | null;
+					status:
+						| "available"
+						| "in_service"
+						| "charging"
+						| "maintenance"
+						| null;
+					/** Profil registrasi (migration 009) */
+					color?: string | null;
+					production_year?: number | null;
+					vehicle_type?: string | null;
+					chassis_number?: string | null;
+					engine_number?: string | null;
+					stnk_expiry?: string | null;
+					ownership_status?:
+						| "company"
+						| "leased"
+						| "personal"
+						| "consortium"
+						| null;
+					leasing_company?: string | null;
+					leasing_contract_end?: string | null;
+					consortium_name?: string | null;
+					consortium_members?: string | null;
+					registration_status?: string | null;
+					/** Kolom operasional (migration 008) */
+					bluetooth_name?: string | null;
+					rental_partner_name?: string | null;
+					rental_partner_phone?: string | null;
+					qr_code_token?: string | null;
+					hub_location?: string | null;
+					efficiency_kwh_per_100km?: number | null;
+					last_odometer_km?: number | null;
 					created_at: string;
 				};
 				Insert: {
 					id?: string;
-					driver_id: string;
-					category: "standard" | "professional" | "premium" | "premium_plus";
-					brand: string;
-					model: string;
+					code?: string | null;
+					name: string;
+					driver_id?: string | null;
+					category?:
+						| "standard"
+						| "professional"
+						| "premium"
+						| "premium_plus"
+						| null;
+					brand?: string | null;
+					model?: string | null;
 					license_plate: string;
-					battery_capacity_kwh: number;
-					status?: "active" | "inactive";
+					battery_capacity_kwh?: number | null;
+					status?:
+						| "available"
+						| "in_service"
+						| "charging"
+						| "maintenance"
+						| null;
+					color?: string | null;
+					production_year?: number | null;
+					vehicle_type?: string | null;
+					chassis_number?: string | null;
+					engine_number?: string | null;
+					stnk_expiry?: string | null;
+					ownership_status?:
+						| "company"
+						| "leased"
+						| "personal"
+						| "consortium"
+						| null;
+					leasing_company?: string | null;
+					leasing_contract_end?: string | null;
+					consortium_name?: string | null;
+					consortium_members?: string | null;
+					registration_status?: string | null;
+					bluetooth_name?: string | null;
+					rental_partner_name?: string | null;
+					rental_partner_phone?: string | null;
+					qr_code_token?: string | null;
+					hub_location?: string | null;
+					efficiency_kwh_per_100km?: number | null;
+					last_odometer_km?: number | null;
 					created_at?: string;
 				};
-				Update: {
-					id?: string;
-					driver_id?: string;
-					category?: "standard" | "professional" | "premium" | "premium_plus";
-					brand?: string;
-					model?: string;
-					license_plate?: string;
-					battery_capacity_kwh?: number;
-					status?: "active" | "inactive";
-					created_at?: string;
-				};
+				Update: Partial<Database["public"]["Tables"]["vehicles"]["Insert"]>;
 			};
 			trips: {
 				Row: {
@@ -472,6 +627,94 @@ export interface Database {
 					created_at?: string;
 				};
 			};
+			special_track_jobs: {
+				Row: {
+					id: string;
+					/**companies.id adalah VARCHAR(255), bukan UUID (migration 002) */
+					company_id: string | null;
+					title: string;
+					description: string;
+					requirements: string[];
+					vehicle_category:
+						| "standard"
+						| "professional"
+						| "premium"
+						| "premium_plus"
+						| null;
+					min_eco_score: number | null;
+					status: "open" | "closed";
+					created_at: string;
+					/** Kolom audit admin (migration 011) */
+					created_by?: string | null;
+					updated_at?: string | null;
+					closed_at?: string | null;
+					/** Menandai lowongan hasil seed lama agar bisa dibedakan dari lowongan asli */
+					is_seed?: boolean;
+				};
+				Insert: {
+					id?: string;
+					company_id?: string | null;
+					title: string;
+					description: string;
+					requirements?: string[];
+					vehicle_category?:
+						| "standard"
+						| "professional"
+						| "premium"
+						| "premium_plus"
+						| null;
+					min_eco_score?: number | null;
+					status?: "open" | "closed";
+					created_at?: string;
+					created_by?: string | null;
+					updated_at?: string | null;
+					closed_at?: string | null;
+					is_seed?: boolean;
+				};
+				Update: Partial<
+					Database["public"]["Tables"]["special_track_jobs"]["Insert"]
+				>;
+			};
+			special_track_applications: {
+				Row: {
+					id: string;
+					job_id: string;
+					driver_id: string;
+					status:
+						| "submitted"
+						| "reviewing"
+						| "accepted"
+						| "rejected"
+						| "withdrawn";
+					eco_score_at_apply: number | null;
+					vehicle_category_at_apply: string | null;
+					created_at: string;
+					/** Jejak review admin (migration 011). reviewed_by tanpa FK: admin belum tentu punya baris driver. */
+					reviewed_by?: string | null;
+					reviewed_at?: string | null;
+					review_note?: string | null;
+				};
+				Insert: {
+					id?: string;
+					job_id: string;
+					driver_id: string;
+					status?:
+						| "submitted"
+						| "reviewing"
+						| "accepted"
+						| "rejected"
+						| "withdrawn";
+					eco_score_at_apply?: number | null;
+					vehicle_category_at_apply?: string | null;
+					created_at?: string;
+					reviewed_by?: string | null;
+					reviewed_at?: string | null;
+					review_note?: string | null;
+				};
+				Update: Partial<
+					Database["public"]["Tables"]["special_track_applications"]["Insert"]
+				>;
+			};
 		};
 	};
 }
@@ -511,3 +754,10 @@ export type BrigacoinTransactionInsert =
 	Database["public"]["Tables"]["brigacoin_transactions"]["Insert"];
 export type BrigacoinTransactionUpdate =
 	Database["public"]["Tables"]["brigacoin_transactions"]["Update"];
+
+export type ActivityLogRow =
+	Database["public"]["Tables"]["activity_logs"]["Row"];
+export type ActivityLogInsert =
+	Database["public"]["Tables"]["activity_logs"]["Insert"];
+export type ActivityLogUpdate =
+	Database["public"]["Tables"]["activity_logs"]["Update"];

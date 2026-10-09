@@ -23,7 +23,7 @@
 | 11 | Session Persistence & Auth State | Secure session persistence using Supabase Auth sessions; remove insecure spoofable localStorage bypass | M3 | ORIGINAL_REQUEST §R3 |
 | 12 | Route Protection Middleware | Implement `src/middleware.ts` to protect private views (`/admin`, `/company`, `/rewards`, `/special-track`, `/verify`, `/go`) and secure API routes | M3 | ORIGINAL_REQUEST §R3 |
 | 13 | Unit Test Infrastructure | Configure `vitest.config.mts` and `"test": "vitest run"` in `package.json` | M4 | ORIGINAL_REQUEST §R4 |
-| 14 | Automated Unit Test Suite | Comprehensive unit tests for token rewards, streak logic, anti-spoofing, physics checks with 100% pass rate | M4 | ORIGINAL_REQUEST §R4 |
+| 14 | Automated Unit Test Suite | Comprehensive unit tests for token rewards, streak logic, anti-spoofing, physics checks with 100% pass rate (currently 217 tests / 26 suites) | M4 | ORIGINAL_REQUEST §R4 |
 | 15 | Environment & Setup Documentation | Document local setup, required environment variables, Supabase migrations, and Vercel configuration in README.md | M5 | ORIGINAL_REQUEST §R5 |
 | 16 | E2E Testing Suite (Tiers 1-4) | Opaque-box requirement-driven test suite verifying verification API, economics, auth, and database integrity | E2E Track | ORIGINAL_REQUEST Acceptance Criteria |
 | 17 | Next.js Production Build Health | Validate `npm run build` succeeds with 0 TypeScript and 0 lint errors | M6 | ORIGINAL_REQUEST Acceptance Criteria |

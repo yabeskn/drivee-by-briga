@@ -1,10 +1,7 @@
-import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-	setValidSession,
-	startTripToHud,
-} from "../fixtures/session";
+import { expect, test } from "@playwright/test";
+import { setValidSession, startTripToHud } from "../fixtures/session";
 
 // ─────────────────────────────────────────────────────────────
 // Sync Recovery — koneksi kembali → antrian IndexedDB di-flush
@@ -28,10 +25,7 @@ test.describe("Sync Recovery", () => {
 
 	test("service worker menyediakan fallback offline.html untuk navigasi", () => {
 		// Kontrak arsitektur: sw.js pre-cache /offline.html
-		const sw = readFileSync(
-			resolve(process.cwd(), "public/sw.js"),
-			"utf-8",
-		);
+		const sw = readFileSync(resolve(process.cwd(), "public/sw.js"), "utf-8");
 		expect(sw).toContain("offline.html");
 	});
 });

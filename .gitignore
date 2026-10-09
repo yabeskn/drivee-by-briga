@@ -24,6 +24,8 @@ playwright/.cache/
 *.pem
 /reports/
 *.csv
+media/
+simulations/
 
 # Debug
 npm-debug.log*
@@ -73,6 +75,7 @@ supabase/.temp/
 .branches/
 
 # WhatsApp / Baileys session — JANGAN pernah di-commit
+sessions/
 .baileys/
 baileys-auth*/
 auth_info_*.json

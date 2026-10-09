@@ -3,42 +3,43 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+	--font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
-html, body {
-  background-color: #000000;
-  color: #f4f4f5;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  margin: 0;
-  padding: 0;
-  overscroll-behavior-y: none;
+html,
+body {
+	background-color: #000000;
+	color: #f4f4f5;
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	margin: 0;
+	padding: 0;
+	overscroll-behavior-y: none;
 }
 
 .bg-oled {
-  background-color: #000000 !important;
+	background-color: #000000;
 }
 
 .safe-top {
-  padding-top: env(safe-area-inset-top, 0.75rem);
+	padding-top: env(safe-area-inset-top, 0.75rem);
 }
 
 .safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 1rem);
+	padding-bottom: env(safe-area-inset-bottom, 1rem);
 }
 
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+	width: 4px;
+	height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 9999px;
+	background: #27272a;
+	border-radius: 9999px;
 }

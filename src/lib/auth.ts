@@ -1,26 +1,25 @@
-import { getSession } from 'next-auth/react';
-import { db } from './db';
+import { getSession } from "next-auth/react";
 
 export interface AuthUser {
-  id: string;
-  email: string;
-  name: string;
-  image?: string;
+	id: string;
+	email: string;
+	name: string;
+	image?: string;
 }
 
 /**
  * Get current authenticated user
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const session = await getSession();
-  if (!session?.user?.email) return null;
+	const session = await getSession();
+	if (!session?.user?.email) return null;
 
-  return {
-    id: session.user.id as string,
-    email: session.user.email,
-    name: session.user.name || '',
-    image: session.user.image || undefined,
-  };
+	return {
+		id: session.user.id as string,
+		email: session.user.email,
+		name: session.user.name || "",
+		image: session.user.image || undefined,
+	};
 }
 
 /**
@@ -31,25 +30,25 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  * sampai tabel drivers lokal tersedia.
  */
 export async function getOrCreateDriverProfile(_user: AuthUser): Promise<null> {
-  // TODO: simpan profil driver ke tabel khusus (bukan tripSessions).
-  return null;
+	// TODO: simpan profil driver ke tabel khusus (bukan tripSessions).
+	return null;
 }
 
 /**
  * Check if user is authenticated
  */
 export async function isAuthenticated(): Promise<boolean> {
-  const user = await getCurrentUser();
-  return !!user;
+	const user = await getCurrentUser();
+	return !!user;
 }
 
 /**
  * Require authentication - throws if not authenticated
  */
 export async function requireAuth(): Promise<AuthUser> {
-  const user = await getCurrentUser();
-  if (!user) {
-    throw new Error('Unauthorized');
-  }
-  return user;
+	const user = await getCurrentUser();
+	if (!user) {
+		throw new Error("Unauthorized");
+	}
+	return user;
 }

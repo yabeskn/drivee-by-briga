@@ -1,10 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import {
-	setValidSession,
-	startTripToHud,
-} from "../fixtures/session";
+import { expect, test } from "@playwright/test";
+import { setValidSession, startTripToHud } from "../fixtures/session";
 
 // ─────────────────────────────────────────────────────────────
 // Offline Queue — PWA offline-first. Saat offline, HUD menampilkan

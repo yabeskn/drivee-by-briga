@@ -3,32 +3,67 @@
 import {
 	ArrowRight,
 	BatteryCharging,
-	Car,
+	Camera,
 	CheckCircle2,
 	Compass,
+	Fuel,
 	Gauge,
 	Loader2,
 	Lock,
 	MapPin,
 	Navigation,
 	Phone,
+	Radio,
 	ShieldCheck,
 	Sparkles,
 	TriangleAlert,
-	Radio,
-	QrCode,
-	Camera,
-	Bluetooth,
+	Zap,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
+import { SpeedometerCaptureModal } from "@/components/vehicle/SpeedometerCaptureModal";
+import { VehicleScannerModal } from "@/components/vehicle/VehicleScannerModal";
 import { checkHubGeofence, type HubGeofenceResult } from "@/lib/geofence";
 import { supabase } from "@/lib/supabase/client";
 import type { EVVehicle } from "@/types/telematics";
-import { SpeedometerCaptureModal } from "@/components/vehicle/SpeedometerCaptureModal";
-import { VehicleScannerModal } from "@/components/vehicle/VehicleScannerModal";
 
 const DEFAULT_VEHICLES: EVVehicle[] = [
+	{
+		id: "veh_byd_atto_1",
+		code: "BYD-01",
+		name: "BYD Atto 1 (Seagull EV)",
+		model: "BYD Atto 1 (30.08 kWh Blade Battery)",
+		licensePlate: "B 1001 BYD",
+		batteryCapacityKwh: 30.08,
+		currentSoC: 95,
+		estimatedRangeKm: 305,
+		hubLocation: "Jalur Bebas Uji Coba",
+		status: "available",
+		efficiencyKwhPer100Km: 11.5,
+		category: "standard",
+		seats: 4,
+		powertrain: "ev",
+		vehicleType: "car",
+	},
+	{
+		id: "veh_yamaha_xride_115",
+		code: "ICE-01",
+		name: "Yamaha X-Ride 115 (2012)",
+		model: "Yamaha X-Ride 115cc (Bensin Pertalite RON 90)",
+		licensePlate: "B 2012 XRD",
+		batteryCapacityKwh: 0,
+		currentSoC: 100,
+		estimatedRangeKm: 200,
+		hubLocation: "Jalur Bebas Uji Coba",
+		status: "available",
+		efficiencyKwhPer100Km: 0,
+		category: "standard",
+		seats: 2,
+		powertrain: "ice",
+		vehicleType: "motorcycle",
+		fuelType: "pertalite",
+		fuelConsumptionKmPerL: 42.0,
+	},
 	{
 		id: "veh_wuling_air_ev",
 		code: "EV-01",
@@ -43,6 +78,8 @@ const DEFAULT_VEHICLES: EVVehicle[] = [
 		efficiencyKwhPer100Km: 10.1,
 		category: "standard",
 		seats: 4,
+		powertrain: "ev",
+		vehicleType: "car",
 	},
 	{
 		id: "veh_hyundai_ioniq_5",
@@ -58,6 +95,42 @@ const DEFAULT_VEHICLES: EVVehicle[] = [
 		efficiencyKwhPer100Km: 14.5,
 		category: "professional",
 		seats: 5,
+		powertrain: "ev",
+		vehicleType: "car",
+	},
+	{
+		id: "veh_gesits_g1",
+		code: "EV-03",
+		name: "Gesits G1 Electric Motor",
+		model: "Gesits G1 (2.7 kWh)",
+		licensePlate: "B 3456 MOT",
+		batteryCapacityKwh: 2.7,
+		currentSoC: 95,
+		estimatedRangeKm: 50,
+		hubLocation: "Jalur Uji Coba Bebas",
+		status: "available",
+		efficiencyKwhPer100Km: 4.5,
+		category: "standard",
+		seats: 2,
+		powertrain: "ev",
+		vehicleType: "motorcycle",
+	},
+	{
+		id: "veh_byd_m6",
+		code: "EV-04",
+		name: "BYD M6 Electric MPV",
+		model: "BYD M6 (71.8 kWh)",
+		licensePlate: "B 7890 BYD",
+		batteryCapacityKwh: 71.8,
+		currentSoC: 90,
+		estimatedRangeKm: 530,
+		hubLocation: "Hub SCBD",
+		status: "available",
+		efficiencyKwhPer100Km: 15.2,
+		category: "premium",
+		seats: 7,
+		powertrain: "ev",
+		vehicleType: "car",
 	},
 ];
 
@@ -79,21 +152,28 @@ interface LoginVehicleScreenProps {
 		corridor: string;
 		/** Hasil validasi geofence Hub Briga.id (lolos saat Start Trip) */
 		geofence: HubGeofenceResult;
+		isTestDriveMode?: boolean;
 	}) => void;
 	activeShift?: ActiveDriverShift | null;
 	onCheckoutShift?: () => void;
 }
 
-export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }: LoginVehicleScreenProps) {
+export function LoginVehicleScreen({
+	onStartTrip,
+	activeShift,
+	onCheckoutShift,
+}: LoginVehicleScreenProps) {
 	const [step, setStep] = useState<"auth" | "vehicle" | "ready">(() => {
 		return activeShift ? "ready" : "auth";
 	});
 	const [phone, setPhone] = useState("");
 	const [pin, setPin] = useState("");
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
-	const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle | null>(() => {
-		return activeShift?.vehicle ?? null;
-	});
+	const [selectedVehicle, setSelectedVehicle] = useState<EVVehicle | null>(
+		() => {
+			return activeShift?.vehicle ?? null;
+		},
+	);
 	const [vehicles, setVehicles] = useState<EVVehicle[]>(DEFAULT_VEHICLES);
 	const [isCheckingGeofence, setIsCheckingGeofence] = useState(false);
 	const [geofenceError, setGeofenceError] = useState<string | null>(null);
@@ -133,10 +213,14 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 	} | null>(null);
 
 	useEffect(() => {
-		fetch('/api/admin/vehicles')
+		fetch("/api/admin/vehicles")
 			.then((res) => res.json())
 			.then((data) => {
-				if (data.success && Array.isArray(data.vehicles) && data.vehicles.length > 0) {
+				if (
+					data.success &&
+					Array.isArray(data.vehicles) &&
+					data.vehicles.length > 0
+				) {
 					setVehicles(data.vehicles);
 				}
 			})
@@ -191,12 +275,27 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 				geofence,
 			});
 		} catch (err) {
-			setGeofenceError(
-				`Validasi geofence gagal: ${(err as Error).message}`,
-			);
+			setGeofenceError(`Validasi geofence gagal: ${(err as Error).message}`);
 		} finally {
 			setIsCheckingGeofence(false);
 		}
+	};
+
+	const handleStartTestDrive = (vehicle?: EVVehicle | null) => {
+		const targetVehicle = vehicle || selectedVehicle || vehicles[0];
+		onStartTrip({
+			vehicle: targetVehicle,
+			startSoc: targetVehicle.currentSoC || 90,
+			startOdo: targetVehicle.lastOdometerKm || 0,
+			corridor: "Jalur Bebas Uji Coba & Kalibrasi",
+			geofence: {
+				allowed: true,
+				distanceMeters: 0,
+				reason: "Mode Uji Coba Telemetri Mandiri",
+				corridorName: "Jalur Bebas Uji Coba",
+			},
+			isTestDriveMode: true,
+		});
 	};
 
 	return (
@@ -205,7 +304,7 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 			<div className="flex items-center justify-between py-3 mb-3 border-b border-zinc-900">
 				<div className="flex items-center space-x-2">
 					<div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-						<svg viewBox="0 0 512 512" className="w-5 h-5">
+						<svg aria-hidden="true" viewBox="0 0 512 512" className="w-5 h-5">
 							<rect width="512" height="512" rx="128" fill="#000000" />
 							<circle
 								cx="256"
@@ -264,6 +363,56 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 				</div>
 			</div>
 
+			{/* QUICK ACCESS: Mode Uji Coba Telemetri & Kalibrasi */}
+			<div className="mb-4 p-3.5 rounded-xl bg-gradient-to-r from-emerald-950/80 via-zinc-900 to-zinc-950 border border-emerald-500/40 shadow-lg space-y-2.5">
+				<div className="flex items-center justify-between gap-2">
+					<div className="space-y-0.5">
+						<div className="flex items-center gap-1.5">
+							<span className="text-xs font-bold text-white flex items-center gap-1">
+								<Sparkles className="w-3.5 h-3.5 text-emerald-400" /> Mode Uji
+								Coba & Kalibrasi
+							</span>
+							<span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono font-semibold">
+								Bypass Booking
+							</span>
+						</div>
+						<p className="text-[11px] text-zinc-400">
+							Pilih armada pengujian untuk capture telemetri & emisi:
+						</p>
+					</div>
+				</div>
+
+				<div className="grid grid-cols-2 gap-2">
+					<button
+						type="button"
+						onClick={() => handleStartTestDrive(DEFAULT_VEHICLES[0])}
+						className="p-2.5 rounded-lg bg-emerald-950/50 hover:bg-emerald-900/70 border border-emerald-500/60 text-left transition-all active:scale-[0.98] shadow"
+					>
+						<div className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+							<Zap className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+							<span className="truncate">BYD Atto 1</span>
+						</div>
+						<div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+							Mobil EV • 30 kWh
+						</div>
+					</button>
+
+					<button
+						type="button"
+						onClick={() => handleStartTestDrive(DEFAULT_VEHICLES[1])}
+						className="p-2.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/60 text-left transition-all active:scale-[0.98] shadow"
+					>
+						<div className="flex items-center gap-1 text-[11px] font-bold text-amber-400">
+							<Fuel className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+							<span className="truncate">Yamaha X-Ride</span>
+						</div>
+						<div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+							Motor • Pertalite 2012
+						</div>
+					</button>
+				</div>
+			</div>
+
 			{/* Progress Steps */}
 			<div className="grid grid-cols-4 gap-1.5 mb-5 select-none">
 				<div
@@ -313,7 +462,10 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 
 						<form onSubmit={handleLogin} className="space-y-4">
 							<div>
-								<label className="block text-xs font-medium text-zinc-300 mb-1.5">
+								<label
+									className="block text-xs font-medium text-zinc-300 mb-1.5"
+									htmlFor="drifee-field-48"
+								>
 									Nomor Handphone
 								</label>
 								<div className="relative">
@@ -321,6 +473,7 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 										<Phone className="w-4 h-4" />
 									</div>
 									<input
+										id="drifee-field-48"
 										type="tel"
 										value={phone}
 										onChange={(e) => setPhone(e.target.value)}
@@ -332,7 +485,10 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 							</div>
 
 							<div>
-								<label className="block text-xs font-medium text-zinc-300 mb-1.5">
+								<label
+									className="block text-xs font-medium text-zinc-300 mb-1.5"
+									htmlFor="drifee-field-47"
+								>
 									PIN / Kode OTP
 								</label>
 								<div className="relative">
@@ -340,6 +496,7 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 										<Lock className="w-4 h-4" />
 									</div>
 									<input
+										id="drifee-field-47"
 										type="password"
 										maxLength={6}
 										value={pin}
@@ -422,56 +579,79 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 								vehicles.map((vehicle) => {
 									const isSelected = selectedVehicle?.id === vehicle.id;
 									return (
-										<div
+										<button
+											type="button"
 											key={vehicle.id}
 											onClick={() => handleSelectVehicle(vehicle)}
-											className={`p-3.5 rounded-xl border transition-colors cursor-pointer ${
+											className={`w-full text-left p-3.5 rounded-xl border transition-colors cursor-pointer ${
 												isSelected
 													? "bg-zinc-900 border-emerald-500"
 													: "bg-zinc-900/60 border-zinc-800"
 											}`}
 										>
-											<div className="flex items-start justify-between">
-												<div className="flex-1">
-													<div className="flex items-center space-x-2">
-														<span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-emerald-950 text-emerald-400 border border-emerald-800/40">
+											<span className="flex items-start justify-between">
+												<span className="flex-1">
+													<span className="flex items-center space-x-2">
+														<span
+															className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border ${
+																vehicle.powertrain === "ice"
+																	? "bg-amber-950/60 text-amber-400 border-amber-800/40"
+																	: "bg-emerald-950 text-emerald-400 border-emerald-800/40"
+															}`}
+														>
 															{vehicle.code}
 														</span>
 														<span className="text-xs font-mono text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded">
 															{vehicle.licensePlate}
 														</span>
-													</div>
+														{vehicle.powertrain === "ice" && (
+															<span className="text-[10px] font-mono text-amber-400/90 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+																Bensin
+															</span>
+														)}
+													</span>
 													<h3 className="text-sm font-medium text-white mt-1.5">
 														{vehicle.name}
 													</h3>
 													<p className="text-[11px] text-zinc-500">
 														{vehicle.model}
 													</p>
-												</div>
+												</span>
 
-												<div className="text-right">
-													<div className="flex items-center justify-end space-x-1 text-emerald-400 font-mono text-sm font-medium">
-														<BatteryCharging className="w-4 h-4" />
-														<span>{vehicle.currentSoC}%</span>
-													</div>
-													<span className="text-[10px] text-zinc-500">
-														~{vehicle.estimatedRangeKm} km
+												<span className="text-right">
+													{vehicle.powertrain === "ice" ? (
+														<span className="flex items-center justify-end space-x-1 text-amber-400 font-mono text-sm font-medium">
+															<Fuel className="w-4 h-4 text-amber-400" />
+															<span>{vehicle.currentSoC}%</span>
+														</span>
+													) : (
+														<span className="flex items-center justify-end space-x-1 text-emerald-400 font-mono text-sm font-medium">
+															<BatteryCharging className="w-4 h-4" />
+															<span>{vehicle.currentSoC}%</span>
+														</span>
+													)}
+													<span className="text-[10px] text-zinc-500 font-mono">
+														{vehicle.powertrain === "ice"
+															? `~${vehicle.fuelConsumptionKmPerL || 42} km/L`
+															: `~${vehicle.estimatedRangeKm} km`}
 													</span>
-												</div>
-											</div>
+												</span>
+											</span>
 
-											<div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500">
-												<div className="flex items-center gap-1">
+											<span className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500">
+												<span className="flex items-center gap-1">
 													<MapPin className="w-3 h-3" />
 													<span className="truncate max-w-[160px]">
 														{vehicle.hubLocation}
 													</span>
-												</div>
-												<div className="font-mono text-zinc-400">
-													{vehicle.batteryCapacityKwh} kWh
-												</div>
-											</div>
-										</div>
+												</span>
+												<span className="font-mono text-zinc-400">
+													{vehicle.powertrain === "ice"
+														? "Pertalite (RON 90)"
+														: `${vehicle.batteryCapacityKwh} kWh`}
+												</span>
+											</span>
+										</button>
 									);
 								})
 							)}
@@ -480,6 +660,7 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 
 					<div className="pt-4 mt-6">
 						<button
+							type="button"
 							onClick={() => setStep("ready")}
 							className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold rounded-lg flex items-center justify-center space-x-2 transition-colors"
 						>
@@ -551,6 +732,7 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 								</p>
 							</div>
 							<button
+								type="button"
 								onClick={() => setStep("vehicle")}
 								className="text-xs text-zinc-400 hover:text-emerald-400 underline underline-offset-2"
 							>
@@ -590,7 +772,9 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 								<div className="flex items-center space-x-2">
 									<CheckCircle2 className="w-4 h-4 flex-shrink-0" />
 									<span className="text-[11px] font-medium">
-										Terverifikasi AI: Odo {aiVerifiedEvidence.odo.toLocaleString('id-ID')} km • Baterai {aiVerifiedEvidence.soc}%
+										Terverifikasi AI: Odo{" "}
+										{aiVerifiedEvidence.odo.toLocaleString("id-ID")} km •
+										Baterai {aiVerifiedEvidence.soc}%
 									</span>
 								</div>
 								<span className="text-[10px] font-mono bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300">
@@ -601,7 +785,10 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 
 						<div className="space-y-3.5 mb-5">
 							<div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3">
-								<label className="flex items-center justify-between text-xs font-medium text-zinc-300 mb-1.5">
+								<label
+									className="flex items-center justify-between text-xs font-medium text-zinc-300 mb-1.5"
+									htmlFor="drifee-field-46"
+								>
 									<span className="flex items-center gap-1.5">
 										<BatteryCharging className="w-4 h-4 text-emerald-400" />
 										Baterai (SoC %)
@@ -611,6 +798,7 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 									</span>
 								</label>
 								<input
+									id="drifee-field-46"
 									type="range"
 									min="20"
 									max="100"
@@ -625,7 +813,10 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 							</div>
 
 							<div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3">
-								<label className="flex items-center justify-between text-xs font-medium text-zinc-300 mb-1.5">
+								<label
+									className="flex items-center justify-between text-xs font-medium text-zinc-300 mb-1.5"
+									htmlFor="drifee-field-45"
+								>
 									<span className="flex items-center gap-1.5">
 										<Gauge className="w-4 h-4 text-cyan-400" />
 										Odometer (km)
@@ -633,6 +824,7 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 								</label>
 								<div className="relative">
 									<input
+										id="drifee-field-45"
 										type="number"
 										step="0.1"
 										value={initialOdo}
@@ -646,11 +838,15 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 							</div>
 
 							<div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3">
-								<label className="flex items-center gap-1.5 text-xs font-medium text-zinc-300 mb-1.5">
+								<label
+									className="flex items-center gap-1.5 text-xs font-medium text-zinc-300 mb-1.5"
+									htmlFor="drifee-field-44"
+								>
 									<Compass className="w-4 h-4 text-emerald-400" />
 									Koridor Rute
 								</label>
 								<select
+									id="drifee-field-44"
 									value={corridor}
 									onChange={(e) => setCorridor(e.target.value)}
 									className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
@@ -716,6 +912,7 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 
 					<div className="pt-2">
 						<button
+							type="button"
 							onClick={handleConfirmStart}
 							disabled={isCheckingGeofence}
 							className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-400 text-zinc-950 font-semibold rounded-lg flex items-center justify-center space-x-2 transition-colors"
@@ -726,7 +923,9 @@ export function LoginVehicleScreen({ onStartTrip, activeShift, onCheckoutShift }
 								<Navigation className="w-5 h-5" />
 							)}
 							<span>
-								{isCheckingGeofence ? "Memvalidasi lokasi Hub..." : "Mulai Perjalanan"}
+								{isCheckingGeofence
+									? "Memvalidasi lokasi Hub..."
+									: "Mulai Perjalanan"}
 							</span>
 						</button>
 						<p className="text-[10px] text-center text-zinc-500 mt-2 font-mono">

@@ -1,15 +1,13 @@
-import { LanguageProvider } from '@/i18n/LanguageContext';
+import { LanguageProvider } from "@/i18n/LanguageContext";
 
 export default function RewardsLayout({
-  children,
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }) {
-  return (
-    <LanguageProvider>
-      <div className="min-h-screen bg-black text-zinc-100">
-        {children}
-      </div>
-    </LanguageProvider>
-  );
+	return (
+		<LanguageProvider>
+			<div className="min-h-screen bg-black text-zinc-100">{children}</div>
+		</LanguageProvider>
+	);
 }

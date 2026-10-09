@@ -1,8 +1,5 @@
-import { test, expect } from "@playwright/test";
-import {
-	setValidSession,
-	startTripToHud,
-} from "../fixtures/session";
+import { expect, test } from "@playwright/test";
+import { setValidSession, startTripToHud } from "../fixtures/session";
 
 // ─────────────────────────────────────────────────────────────
 // Active Driving HUD — telematik real-time saat trip aktif

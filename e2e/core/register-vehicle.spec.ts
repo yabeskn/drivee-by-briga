@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 // ─────────────────────────────────────────────────────────────
 // Vehicle Registration — multi-step wizard (public route).

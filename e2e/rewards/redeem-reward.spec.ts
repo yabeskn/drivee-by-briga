@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { setValidSession } from "../fixtures/session";
 
 // ─────────────────────────────────────────────────────────────
@@ -32,9 +32,7 @@ test.describe("Redeem Reward", () => {
 		await page.goto("/rewards");
 		// "Klaim Subsidi" (panel ESG) atau "Tukar" (kartu reward)
 		await expect(
-			page
-				.getByRole("button", { name: /Tukar|Klaim/ })
-				.first(),
+			page.getByRole("button", { name: /Tukar|Klaim/ }).first(),
 		).toBeVisible({ timeout: 15_000 });
 	});
 });

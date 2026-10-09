@@ -1,8 +1,8 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
+	endTripToDashboard,
 	setValidSession,
 	startTripToHud,
-	endTripToDashboard,
 } from "../fixtures/session";
 
 // ─────────────────────────────────────────────────────────────
@@ -20,9 +20,7 @@ test.describe("End Trip Flow", () => {
 		await endTripToDashboard(page);
 		// EndTripDashboard menampilkan ringkasan reward
 		await expect(page.getByText("Verifikasi Akhir")).toBeVisible();
-		await expect(
-			page.getByText("BrigaCoins").first(),
-		).toBeVisible();
+		await expect(page.getByText("BrigaCoins").first()).toBeVisible();
 	});
 
 	test("tombol Selesai Trip tersedia saat trip aktif", async ({ page }) => {

@@ -1,6 +1,6 @@
-import { expect, type Page } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { expect, type Page } from "@playwright/test";
 import { SignJWT } from "jose";
 
 // Playwright tidak auto-load .env.local — baca manual untuk
@@ -19,7 +19,9 @@ function loadEnvLocal(): Record<string, string> {
 }
 const envLocal = loadEnvLocal();
 const SUPABASE_URL =
-	process.env.NEXT_PUBLIC_SUPABASE_URL || envLocal.NEXT_PUBLIC_SUPABASE_URL || "";
+	process.env.NEXT_PUBLIC_SUPABASE_URL ||
+	envLocal.NEXT_PUBLIC_SUPABASE_URL ||
+	"";
 
 /**
  * Storage key sesi supabase-js: `sb-<hostname pertama>-auth-token`.
@@ -62,7 +64,9 @@ export const TEST_USER_NAME = "E2E Driver";
 /** JWT HS256 dengan klaim sesi Supabase standar (sub/email/exp). */
 export async function createSessionToken(): Promise<string> {
 	const secretValue =
-		process.env.SUPABASE_JWT_SECRET || envLocal.SUPABASE_JWT_SECRET || "e2e-not-a-real-secret";
+		process.env.SUPABASE_JWT_SECRET ||
+		envLocal.SUPABASE_JWT_SECRET ||
+		"e2e-not-a-real-secret";
 	const secret = new TextEncoder().encode(secretValue);
 	const issuedAt = Math.floor(Date.now() / 1000);
 	// Issuer HARUS cocok dengan yang divalidasi middleware:
@@ -91,7 +95,9 @@ export async function createSessionToken(): Promise<string> {
  * agar checkHubGeofence() lolos di e2e.
  */
 export async function mockDriverHubGeolocation(page: Page): Promise<void> {
-	await page.context().grantPermissions(["geolocation"], { origin: "http://localhost:3000" });
+	await page
+		.context()
+		.grantPermissions(["geolocation"], { origin: "http://localhost:3000" });
 	await page.context().setGeolocation({
 		latitude: -6.30816,
 		longitude: 107.14987,
@@ -153,9 +159,9 @@ export async function startTripToHud(page: Page): Promise<void> {
 		// Klik "Lanjut" hanya bila masih ada (klik kartu kadang sudah
 		// memindahkan step — jangan anggap gagal bila tombol hilang).
 		await page.evaluate(() => {
-			const btn = [...document
-				.querySelectorAll("button")]
-				.find((b) => (b.textContent || "").includes("Lanjut"));
+			const btn = [...document.querySelectorAll("button")].find((b) =>
+				(b.textContent || "").includes("Lanjut"),
+			);
 			btn?.click();
 		});
 		await page

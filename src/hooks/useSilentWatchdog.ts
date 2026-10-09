@@ -313,8 +313,7 @@ export function useSilentWatchdog({
 			if (headingRef.current.length > 240) headingRef.current.shift();
 		};
 
-		if (hasMotion || hasOrientation)
-			void attachSensorsWithPermission();
+		if (hasMotion || hasOrientation) void attachSensorsWithPermission();
 
 		// Tanpa sensor motion sama sekali → anomali langsung (tidak sinkron)
 		// (diabaikan pada mode simulasi desktop/e2e)
